@@ -84,7 +84,8 @@ sub ProcessMessage
 	my ($envelopeFrom, @envelopeTo) = ProcessEnvelope($envelope);
 
 	# If the all of the recipients are whitelisted, then accept the message.
-	my $sth = $dbh->prepare('SELECT rcpt_to FROM whitelist_to');
+	my $sth = $dbh->prepare(
+		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content');
 	$sth->execute;
 	my $whitelistTo = $sth->fetchall_arrayref;
 	my @whitelistRcpts = grep {
