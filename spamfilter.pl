@@ -2,7 +2,8 @@
 
 use strict;
 
-use constant REJECTED => 30;
+use constant VIRUS => 29;
+use constant SPAM => 30;
 use constant TEMPORARY_FAILURE => 73;
 
 my ($cfg, $home);
@@ -29,53 +30,58 @@ BEGIN {
 use MySpamAssassin;
 use MysqlAutoWhitelist;
 use DBI;
+use IO::Socket::INET;
 
-# Read in the message and the envelope headers.
-my $message = join '', <STDIN>;
-open SOUT, '<&1';
-my $envelope = <SOUT>;
-close SOUT;
+main();
 
-# If the message is above a certain size, then automatically accept it.
-if (length($message) > $cfg->val('General', 'maxMessageLength')) {
-	# The AcceptMessage subroutine returns the exit code of qmail-queue,
-	# which should be returned to qmail-smtpd.
-	exit AcceptMessage($envelope, \$message);
-}
+sub main
+{
+	# Read in the message and the envelope headers.
+	my $message = join '', <STDIN>;
+	open SOUT, '<&1';
+	my $envelope = <SOUT>;
+	close SOUT;
 
-# Open a connection to the database to fetch the whitelists.
-my $dsn = $cfg->val('AutoWhitelist', 'dsn');
-my $user = $cfg->val('AutoWhitelist', 'user');
-my $password = $cfg->val('AutoWhitelist', 'password');
-my $dbh = DBI->connect($dsn, $user, $password,
-	{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
-$dbh->do('LOCK TABLE auto_whitelist IN ACCESS EXCLUSIVE MODE');
-#$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+	# If the message is above a certain size, then automatically accept it.
+	if (length($message) > $cfg->val('General', 'maxMessageLength')) {
+		# The AcceptMessage subroutine returns the exit code of qmail-queue,
+		# which should be returned to qmail-smtpd.
+		exit AcceptMessage($envelope, \$message, 0, undef);
+	}
 
-my $returnCode;
-eval { $returnCode = ProcessMessage() };
-my $status = $@;
-if ($status) {
-	$dbh->rollback;
-	$dbh->disconnect;
-	print $status;
-	exit TEMPORARY_FAILURE;
-}
-else {
-	$dbh->commit;
-	$dbh->disconnect;
-	exit $returnCode;
+	# Open a connection to the database to fetch the whitelists.
+	my $dsn = $cfg->val('AutoWhitelist', 'dsn');
+	my $user = $cfg->val('AutoWhitelist', 'user');
+	my $password = $cfg->val('AutoWhitelist', 'password');
+	my $dbh = DBI->connect($dsn, $user, $password,
+		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
+	$dbh->do('LOCK TABLE auto_whitelist IN ACCESS EXCLUSIVE MODE');
+#	$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+
+	my $returnCode;
+	eval { $returnCode = ProcessMessage(\$message, $envelope, $dbh) };
+	my $status = $@;
+	if ($status) {
+		$dbh->rollback;
+		$dbh->disconnect;
+		exit TEMPORARY_FAILURE;
+	}
+	else {
+		$dbh->commit;
+		$dbh->disconnect;
+		exit $returnCode;
+	}
 }
 
 sub ProcessMessage
 {
+	my ($message, $envelope, $dbh) = @_;
+
 	# Create the the auto-whitelist factory.
 	my $factory = new MysqlAutoWhitelist($dbh);
 
 	# Determine who sent the mail and to whom it is to be delivered.
-	my ($envelopeFrom, @envelopeTo) = split /\x00+/, $envelope;
-	$envelopeFrom =~ s/^F//;
-	@envelopeTo = map { /^T(.*)/; lc $1 } @envelopeTo;
+	my ($envelopeFrom, @envelopeTo) = ProcessEnvelope($envelope);
 
 	# If the all of the recipients are whitelisted, then accept the message.
 	my $sth = $dbh->prepare('SELECT rcpt_to FROM whitelist_to');
@@ -86,18 +92,19 @@ sub ProcessMessage
 	} @envelopeTo;
 
 	if (scalar(@whitelistRcpts) == scalar(@envelopeTo)) {
-		return AcceptMessage($envelope, \$message);
+		return AcceptMessage($envelope, $message, 1, $dbh);
 	}
 
 	# Check the message and accept it if it is not spam.
 	my $status = CheckMessage($message, \@envelopeTo, $factory);
 	if (!$status->is_spam()) {
-		return AcceptMessage($envelope, \$message);
+		return AcceptMessage($envelope, $message, 1, $dbh);
 	}
 	elsif ($status->get_hits() < $cfg->val('General', 'rejectThreshold')) {
 		$status->rewrite_mail();
-		$message = $status->get_full_message_as_text();
-		return AcceptMessage($envelope, \$message);
+		my $spamMessage = $status->get_full_message_as_text();
+		$message = \$spamMessage;
+		return AcceptMessage($envelope, $message, 0, $dbh);
 	}
 
 	# The message is spam. In case of false positives, add the message to the
@@ -107,7 +114,7 @@ sub ProcessMessage
 			(mail_from, ip_address, contents, hits, tests, created)
 			VALUES (?, ?, ?, ?, ?, NOW())');
 
-	$sth->execute($envelopeFrom, $ENV{TCPREMOTEIP}, $message,
+	$sth->execute($envelopeFrom, $ENV{TCPREMOTEIP}, $$message,
 		$status->get_hits(), $status->get_names_of_tests_hit());
 
 	$sth = $dbh->prepare(
@@ -117,7 +124,19 @@ sub ProcessMessage
 	map { $sth->execute($_) } @envelopeTo;
 
 	# Return an error status to qmail-smtpd.
-	return REJECTED;
+	return SPAM;
+}
+
+sub ProcessEnvelope
+{
+	my $envelope = shift;
+
+	# Determine who sent the mail and to whom it is to be delivered.
+	my ($envelopeFrom, @envelopeTo) = split /\x00+/, $envelope;
+	$envelopeFrom =~ s/^F//;
+	@envelopeTo = map { /^T(.*)/; lc $1 } @envelopeTo;
+
+	return ($envelopeFrom, @envelopeTo);
 }
 
 sub CheckMessage
@@ -164,13 +183,17 @@ sub CheckMessage
 
 	# Return the PerMsgStatus object that specifies the status of the
 	# message.
-	return $assassin->check_message_text($message);
+	return $assassin->check_message_text($$message);
 }
 
 sub AcceptMessage
 {
 	# The message is passed by reference as it could potentially be large.
-	my ($envelope, $message) = @_;
+	my ($envelope, $message, $checkVirus, $dbh) = @_;
+
+	if ($checkVirus) {
+		return VIRUS if CheckVirus($envelope, $message, $dbh);
+	}
 
 	# Fork a child process to queue the message.
 	pipe ENVREAD, ENVWRITE;
@@ -186,6 +209,8 @@ sub AcceptMessage
 		close STDOUT;
 		open STDIN, '<&MSGREAD';
 		open STDOUT, '<&ENVREAD';
+		close MSGREAD;
+		close ENVREAD;
 
 		# Invoke qmail-queue.
 		exec 'bin/qmail-queue';
@@ -202,6 +227,53 @@ sub AcceptMessage
 	# Wait for qmail-queue to finish and then return its exit status.
 	waitpid $pid, 0;
 	return $? >> 8;
+}
+
+sub CheckVirus
+{
+	# The message is passed by reference.
+	my ($envelope, $message, $dbh) = @_;
+
+	my $socket = new IO::Socket::INET(
+		PeerAddr => 'localhost',
+		PeerPort => 3310,
+		Type => SOCK_STREAM,
+		Timeout => 5)
+		or die $@;
+
+	print $socket "STREAM\n";
+	my $response = <$socket>;
+	my ($port) = $response =~ /PORT\s+(\d+)/;
+	my $stream = new IO::Socket::INET(
+		PeerAddr => 'localhost',
+		PeerPort => $port,
+		Type => SOCK_STREAM,
+		Timeout => 5)
+		or die $@;
+
+	print $stream $$message;
+	$stream->close;
+	$response = <$socket>;
+	$socket->close;
+	chomp $response;
+	if ($response =~ /(\S+)\s+FOUND$/) {
+		my $virus = $1;
+		my ($envelopeFrom, @envelopeTo) = ProcessEnvelope($envelope);
+		my $sth = $dbh->prepare(
+			'INSERT INTO viruses
+				(mail_from, ip_address, contents, virus, created)
+				VALUES (?, ?, ?, ?, NOW())');
+		$sth->execute($envelopeFrom, $ENV{TCPREMOTEIP}, $$message, $virus);
+
+		$sth = $dbh->prepare(
+			'INSERT INTO virus_recipients (recipient, virus_id)
+				VALUES (?, CURRVAL(\'viruses_id_seq\'))');
+
+		map { $sth->execute($_) } @envelopeTo;
+		return 1;
+	}
+
+	return undef;
 }
 
 sub acceptAddress
