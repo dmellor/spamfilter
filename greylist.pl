@@ -63,7 +63,8 @@ sub checkGreylist
 	}
 
 	# Check if the recipient address is whitelisted.
-	$sth = $dbh->prepare('SELECT rcpt_to FROM whitelist_to');
+	$sth = $dbh->prepare(
+		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_greylist');
 	$sth->execute;
 	while ($row = $sth->fetchrow_arrayref) {
 		return ACCEPTED if acceptAddress($rcptTo, $row->[0]);
