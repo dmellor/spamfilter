@@ -150,9 +150,13 @@ sub CheckMessage
 		home_dir_for_helpers => $home
 	});
 
+	# Make sure that the init method is called before setting the persistent
+	# address list factory, otherwise the call to check_message_text will
+	# override the setting. Since we are not using per-user preferences, a zero
+	# value is passed to the init method.
+	$assassin->init(0);
 	$assassin->set_persistent_address_list_factory($factory);
 	my $config = $assassin->{conf};
-#	$config->{razor_config} = "$home/razor.conf";
 
 	# Add the user-defined whitelists to the SpamAssassin configuration.
 	my $dbh = $factory->getDbHandle();
