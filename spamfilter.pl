@@ -137,9 +137,10 @@ sub CheckMessage
 	# Add the user-defined whitelists to the SpamAssassin configuration.
 	my $dbh = $factory->getDbHandle();
 	my $sth = $dbh->prepare(
-		'SELECT whitelist.mail_from FROM whitelist, user_addresses
-			WHERE user_addresses.address = ? AND
-				user_addresses.user_id = whitelist.users_id');
+		'SELECT c.mail_from FROM user_addresses AS a JOIN
+			whitelist_from AS b ON a.user_id = b.user_id JOIN
+			mail_from_addresses AS c ON c.id = b.mail_from_id
+			WHERE a.address = ?');
 
 	foreach my $recipient (@$recipients) {
 		$sth->execute($recipient);
