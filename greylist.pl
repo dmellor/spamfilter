@@ -1,18 +1,22 @@
 #!/usr/bin/perl
+# $Id$
 
 use strict;
 
 use Config::IniFiles;
 use DBI;
+use IO::Handle;
 
-use constant ACCEPTED => 0;
-use constant REJECTED => 1;
+use constant ACCEPTED => 'dunno';
+use constant REJECTED =>
+	'defer_if_permit System temporarily unavailable, please try again later';
 
-main();
+STDOUT->autoflush(1);
+main(@ARGV);
 
 sub main
 {
-	my $home = $ENV{SPAMFILTER_HOME};
+	my $home = shift;
 	my $cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
 	my $dsn = $cfg->val('Greylist', 'dsn');
 	my $user = $cfg->val('Greylist', 'user');
@@ -20,37 +24,122 @@ sub main
 	my $dbh = DBI->connect($dsn, $user, $password,
 		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
 
-	my $returnCode;
-	eval { $returnCode = checkGreylist($dbh) };
-	my $status = $@;
+	my $debug = $cfg->val('Greylist', 'debug');
+	if ($debug) {
+		close STDERR;
+		open STDERR, ">>$home/greylist.$$.log";
+		STDERR->autoflush(1);
+	}
+
+	process($dbh, $debug);
+	$dbh->disconnect;
+}
+
+sub process
+{
+	my ($dbh, $debug) = @_;
+
+	# Extract the greylist information from the policy delegation information
+	# sent by Postfix.
+	my ($ip, $mailFrom, $rcptTo, $helo);
+	while (<STDIN>) {
+		print STDERR "Read: $_" if $debug;
+		last if $_ eq "\n";
+		chomp;
+		my ($name, $value) = /^([^=]*)=(.*)/;
+		if ($name eq 'client_address') {
+			$ip = $value;
+			print STDERR "ip is $ip\n" if $debug;
+		}
+		elsif ($name eq 'sender') {
+			$mailFrom = $value;
+			print STDERR "mailFrom is $mailFrom\n" if $debug;
+		}
+		elsif ($name eq 'recipient') {
+			$rcptTo = $value;
+			print STDERR "rcptTo is $rcptTo\n" if $debug;
+		}
+		elsif ($name eq 'helo_name') {
+			$helo = $value;
+			print STDERR "helo is $helo\n" if $debug;
+		}
+	}
+
+	my $retries = 0;
+	my $action;
+	my $retry;
+	my $status;
+	while ($retries < 2) {
+		($action, $retry, $status) = performChecks($dbh, $retries, $ip,
+			$mailFrom, $rcptTo, $helo);
+		last unless $retry;
+		$retries++;
+		sleep 10;
+	}
+		
 	if ($status) {
-		$dbh->rollback;
-		$dbh->disconnect;
-		exit REJECTED;
+		$status =~ tr/\n/_/;
+		print "action=451 $status\n\n";
+		print STDERR "action=451 $status\n\n" if $debug;
 	}
 	else {
-		$dbh->commit;
-		$dbh->disconnect;
-		exit $returnCode;
+		print "action=$action\n\n";
+		print STDERR "action=$action\n\n" if $debug;
 	}
 }
 
-sub checkGreylist
+sub performChecks
 {
-	my $dbh = shift;
+	my ($dbh, $attempt, $ip, $mailFrom, $rcptTo, $helo) = @_;
 
-	my $ip = $ENV{TCPREMOTEIP};
-	my $mailFrom = lc $ENV{MAILFROM};
-	my $rcptTo = lc $ENV{RCPTTO};
+	my $action;
+	eval {
+		if ($attempt == 0) {
+#			$dbh->do('LOCK TABLE greylist IN ACCESS EXCLUSIVE MODE');
+			$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+		}
 
-	$dbh->do('LOCK TABLE greylist IN ACCESS EXCLUSIVE MODE');
+		$action = updateDB($dbh, $ip, $mailFrom, $rcptTo, $helo);
+	}; 
+
+	my $status = $@;
+	if ($status) {
+		$dbh->rollback;
+		return (undef, 1, $status);
+	}
+	else {
+		$dbh->commit;
+		return $action;
+	}
+}
+
+sub updateDB
+{
+	my ($dbh, $ip, $mailFrom, $rcptTo, $helo) = @_;
 
 	my $logSth = $dbh->prepare(
-		'INSERT INTO logs (ip_address, mail_from, rcpt_to, created)
-			VALUES (?, ?, ?, NOW())');
-	$logSth->execute($ip, $mailFrom, $rcptTo);
+		'INSERT INTO logs (ip_address, mail_from, rcpt_to, helo, created)
+			VALUES (?, ?, ?, ?, NOW())');
+	$logSth->execute($ip, $mailFrom, $rcptTo, $helo);
 
-	# Check if the sender address is whitelisted.
+	# Check if the sender or recipient address is whitelisted.
+	my $isWhitelisted = checkWhitelist($dbh, $mailFrom, $rcptTo);
+
+	# Update the greylist table. We do this even if the sender or recipient
+	# addresses have been whitelisted to ensure that the greylist table is
+	# populated for those addresses. This allows greylisting to be enabled in
+	# the future for those addresses without causing any delay in the
+	# acceptance of mail.
+	my $greylistStatus = checkGreylist($dbh, $ip, $mailFrom, $rcptTo);
+
+	# The whitelist status takes precedence over the greylist status.
+	return $isWhitelisted || $greylistStatus;
+}
+
+sub checkWhitelist
+{
+	my ($dbh, $mailFrom, $rcptTo) = @_;
+
 	my $sth = $dbh->prepare(
 		'SELECT c.mail_from FROM user_addresses AS a JOIN
 			whitelist_from AS b ON a.user_id = b.user_id JOIN
@@ -70,8 +159,15 @@ sub checkGreylist
 		return ACCEPTED if acceptAddress($rcptTo, $row->[0]);
 	}
 
+	return undef;
+}
+
+sub checkGreylist
+{
+	my ($dbh, $ip, $mailFrom, $rcptTo) = @_;
+
 	# Check if the tuple has been seen before.
-	$sth = $dbh->prepare(
+	my $sth = $dbh->prepare(
 		q(SELECT id,
 			CASE NOW() - created > INTERVAL '1 hour'
 				WHEN TRUE THEN 1
@@ -89,7 +185,7 @@ sub checkGreylist
 		$sth = $dbh->prepare(
 			'SELECT COUNT(*) FROM classc_domains WHERE domain = ?');
 		$sth->execute($domain);
-		$row = $sth->fetchrow_arrayref;
+		my $row = $sth->fetchrow_arrayref;
 		if ($row->[0]) {
 			$sth = $dbh->prepare(
 				q(SELECT id,

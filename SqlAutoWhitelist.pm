@@ -1,4 +1,4 @@
-package MysqlAutoWhitelist;
+package SqlAutoWhitelist;
 
 use strict;
 
@@ -13,10 +13,11 @@ sub new
 {
 	my ($class, $dbh) = @_;
 
-	my $self = $class->SUPER::new();
-	$self->{dbh} = $dbh;
+	my $type = ref($class) || $class;
+	my $obj = $type->SUPER::new();
+	$obj->{dbh} = $dbh;
 
-	return $self;
+	return $obj;
 }
 
 # Returns the database handle.

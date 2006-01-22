@@ -1,111 +1,143 @@
 #!/usr/bin/perl
+# $Id$
 
 use strict;
 
-use constant VIRUS => 29;
-use constant SPAM => 30;
-use constant TEMPORARY_FAILURE => 73;
+# Add the directory containing the spamfilter scripts to the Perl include path.
+my $home;
 
-my ($cfg, $home);
-
-# Check in the BEGIN block if the connection to the SMTP server has been made
-# from an interface on which filtering is to be performed. If not, then we
-# immediately exec an instance of qmail-queue, which will prevent all of the
-# SpamAssassin code from ever being compiled. Note that qmail-smtpd has already
-# performed a chdir to /var/qmail before execing this script.
 BEGIN {
-	use lib $ENV{SPAMFILTER_HOME};
-	use Config::IniFiles;
-
-	$home = $ENV{SPAMFILTER_HOME};
-	$cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
-	my @interfaces = $cfg->val('General', 'interfaces');
-	if (grep($_ eq $ENV{TCPLOCALIP}, @interfaces) == 0 ||
-		defined($ENV{RELAYCLIENT})) {
-		exec 'bin/qmail-queue';
-	}
+	$home = shift;
+	unshift @INC, $home;
 }
 
-# Load the remainder of the modules.
+package SpamFilter;
+
+use BeforeQueueProxy;
 use MySpamAssassin;
-use MysqlAutoWhitelist;
+use SqlAutoWhitelist;
+use Mail::SpamAssassin::Message;
 use DBI;
 use IO::Socket::INET;
 
-main();
+our @ISA = qw(BeforeQueueProxy);
 
-sub main
+sub checkMessage
 {
-	# Read in the message and the envelope headers.
-	my $message = join '', <STDIN>;
-	open SOUT, '<&1';
-	my $envelope = <SOUT>;
-	close SOUT;
+	my ($self, $message) = @_;
 
-	# If the message is above a certain size, then automatically accept it.
-	if (length($message) > $cfg->val('General', 'maxMessageLength')) {
-		# The AcceptMessage subroutine returns the exit code of qmail-queue,
-		# which should be returned to qmail-smtpd.
-		exit AcceptMessage($envelope, \$message, 0, undef);
+	print STDERR "Entering check message\n" if $self->debug;
+
+	# If the remote address is in the POP before SMTP table, then we do not
+	# perform any checks.
+	my $addr = $self->getAttribute('remoteAddr');
+	my $cfg = $self->getArgument('Config');
+	my $db = $cfg->val('General', 'popDb');
+#	open POSTMAP, "/usr/sbin/postmap -q $addr $db |"
+#		or die 'Could not access db';
+#	my $line = <POSTMAP>;
+#	close POSTMAP;
+#	return 1 if $line =~ /^ok/;
+
+	# The client is an external client - perform the spam and virus checks.
+	my $dbh = $self->getArgument('Dbh');
+	$self->setAttribute('dbh', $dbh);
+	my $retries = 0;
+	my $ok;
+	my $retry;
+	my $status;
+	while ($retries < 2) {
+		($ok, $retry, $status) = $self->performChecks($message, $retries);
+		last unless $retry;
+		$retries++;
+		sleep 10;
 	}
 
-	# Open a connection to the database to fetch the whitelists.
-	my $dsn = $cfg->val('AutoWhitelist', 'dsn');
-	my $user = $cfg->val('AutoWhitelist', 'user');
-	my $password = $cfg->val('AutoWhitelist', 'password');
-	my $dbh = DBI->connect($dsn, $user, $password,
-		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
-	$dbh->do('LOCK TABLE auto_whitelist IN ACCESS EXCLUSIVE MODE');
-#	$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+	$self->setErrorResponse("451 $status") if $status;
+	return $ok;
+}
 
-	my $returnCode;
-	eval { $returnCode = ProcessMessage(\$message, $envelope, $dbh) };
+sub performChecks
+{
+	my ($self, $message, $attempt) = @_;
+
+	my $dbh = $self->getAttribute('dbh');
+	my $ok;
+	eval {
+		if ($attempt == 0) {
+#			$dbh->do('LOCK TABLE auto_whitelist IN ACCESS EXCLUSIVE MODE');
+			$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+		}
+
+		print STDERR "Calling spamcheck\n" if $self->debug;
+		$ok = $self->spamcheck($message);
+		print STDERR "spamchek returned $ok\n" if $self->debug;
+		if ($ok && $self->getAttribute('virusCheck')) {
+			print STDERR "Calling viruscheck\n" if $self->debug;
+			$ok = $self->viruscheck($message);
+			print STDERR "viruscheck returned $ok\n" if $self->debug;
+		}
+	};
+
 	my $status = $@;
 	if ($status) {
 		$dbh->rollback;
-		$dbh->disconnect;
-		exit TEMPORARY_FAILURE;
+		$status =~ s/\r?\n/ /g;
+		print STDERR "rollback - status = $status\n" if $self->debug;
+		return (undef, 1, $status);
 	}
 	else {
 		$dbh->commit;
-		$dbh->disconnect;
-		exit $returnCode;
+		return $ok;
 	}
 }
 
-sub ProcessMessage
+sub spamcheck
 {
-	my ($message, $envelope, $dbh) = @_;
+	my ($self, $message) = @_;
 
-	# Create the the auto-whitelist factory.
-	my $factory = new MysqlAutoWhitelist($dbh);
+	# If the message is above a certain size, then automatically accept it.
+	my $cfg = $self->getArgument('Config');
+	my $maxLength = $cfg->val('General', 'maxMessageLength');
+	my $length = 0;
+	foreach my $line (@$message) {
+		$length += length($line);
+		if ($length > $maxLength) {
+			$self->setAttribute('virusCheck', 0);
+			return 1;
+		}
+	}
 
 	# Determine who sent the mail and to whom it is to be delivered.
-	my ($envelopeFrom, @envelopeTo) = ProcessEnvelope($envelope);
+	my $envelopeFrom = $self->getMailFrom;
+	my $envelopeTo = $self->getRcptTo;
 
 	# If the all of the recipients are whitelisted, then accept the message.
+	my $dbh = $self->getArgument('Dbh');
 	my $sth = $dbh->prepare(
 		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content');
 	$sth->execute;
 	my $whitelistTo = $sth->fetchall_arrayref;
 	my @whitelistRcpts = grep {
 		isAddressWhitelisted(lc $_, $whitelistTo)
-	} @envelopeTo;
+	} @$envelopeTo;
 
-	if (scalar(@whitelistRcpts) == scalar(@envelopeTo)) {
-		return AcceptMessage($envelope, $message, 1, $dbh);
+	if (scalar(@whitelistRcpts) == scalar(@$envelopeTo)) {
+		$self->setAttribute('virusCheck', 1);
+		return 1;
 	}
 
 	# Check the message and accept it if it is not spam.
-	my $status = CheckMessage($message, \@envelopeTo, $factory);
-	if (!$status->is_spam()) {
-		return AcceptMessage($envelope, $message, 1, $dbh);
+	my $factory = new SqlAutoWhitelist($dbh);
+	my $status = spamAssassinCheck($message, $envelopeTo, $factory);
+	if (!$status->is_spam) {
+		$self->setAttribute('virusCheck', 1);
+		return 1;
 	}
-	elsif ($status->get_hits() < $cfg->val('General', 'rejectThreshold')) {
-		$status->rewrite_mail();
-		my $spamMessage = $status->get_full_message_as_text();
-		$message = \$spamMessage;
-		return AcceptMessage($envelope, $message, 0, $dbh);
+	elsif ($status->get_hits < $cfg->val('General', 'rejectThreshold')) {
+		@$message = ($status->rewrite_mail);
+		$self->setAttribute('virusCheck', 0);
+		return 1;
 	}
 
 	# The message is spam. In case of false positives, add the message to the
@@ -115,34 +147,26 @@ sub ProcessMessage
 			(mail_from, ip_address, contents, hits, tests, created)
 			VALUES (?, ?, ?, ?, ?, NOW())');
 
-	$sth->execute($envelopeFrom, $ENV{TCPREMOTEIP}, $$message,
-		$status->get_hits(), $status->get_names_of_tests_hit());
+	$sth->execute($envelopeFrom, $self->getAttribute('remoteAddr'),
+		join('', @$message), $status->get_hits,
+		$status->get_names_of_tests_hit);
 
 	$sth = $dbh->prepare(
 		'INSERT INTO saved_mail_recipients (recipient, saved_mail_id)
 			VALUES (?, CURRVAL(\'saved_mail_id_seq\'))');
+	map { $sth->execute($_) } @$envelopeTo;
 
-	map { $sth->execute($_) } @envelopeTo;
-
-	# Return an error status to qmail-smtpd.
-	return SPAM;
+	# Reject the message.
+	$self->setErrorResponse(
+		'550 Message was identified as spam and is rejected');
+	return undef;
 }
 
-sub ProcessEnvelope
-{
-	my $envelope = shift;
-
-	# Determine who sent the mail and to whom it is to be delivered.
-	my ($envelopeFrom, @envelopeTo) = split /\x00+/, $envelope;
-	$envelopeFrom =~ s/^F//;
-	@envelopeTo = map { /^T(.*)/; lc $1 } @envelopeTo;
-
-	return ($envelopeFrom, @envelopeTo);
-}
-
-sub CheckMessage
+sub spamAssassinCheck
 {
 	my ($message, $recipients, $factory) = @_;
+
+	my $messageObj = new Mail::SpamAssassin::Message({ message => $message });
 
 	# Create the SpamAssassin instance and set the factory instance.
 	my $assassin = new MySpamAssassin({
@@ -188,56 +212,35 @@ sub CheckMessage
 
 	# Return the PerMsgStatus object that specifies the status of the
 	# message.
-	return $assassin->check_message_text($$message);
+	return $assassin->check($messageObj);
 }
 
-sub AcceptMessage
+sub isAddressWhitelisted
 {
-	# The message is passed by reference as it could potentially be large.
-	my ($envelope, $message, $checkVirus, $dbh) = @_;
+	my ($address, $whitelist) = @_;
 
-	if ($checkVirus) {
-		return VIRUS if CheckVirus($envelope, $message, $dbh);
+	foreach (@$whitelist) {
+		return 1 if acceptAddress($address, $_->[0]);
 	}
 
-	# Fork a child process to queue the message.
-	pipe ENVREAD, ENVWRITE;
-	pipe MSGREAD, MSGWRITE;
-	my $pid;
-	unless ($pid = fork) {
-		defined $pid or die "Could not fork qmail-queue, $!";
-
-		# Copy the read descriptors in the child to file descriptors 0 and 1.
-		close ENVWRITE;
-		close MSGWRITE;
-		close STDIN;
-		close STDOUT;
-		open STDIN, '<&MSGREAD';
-		open STDOUT, '<&ENVREAD';
-		close MSGREAD;
-		close ENVREAD;
-
-		# Invoke qmail-queue.
-		exec 'bin/qmail-queue';
-	}
-
-	# Write the envelope and message to qmail-queue.
-	close ENVREAD;
-	close MSGREAD;
-	print MSGWRITE $$message;
-	close MSGWRITE;
-	print ENVWRITE $envelope;
-	close ENVWRITE;
-
-	# Wait for qmail-queue to finish and then return its exit status.
-	waitpid $pid, 0;
-	return $? >> 8;
+	return undef;
 }
 
-sub CheckVirus
+sub acceptAddress
 {
-	# The message is passed by reference.
-	my ($envelope, $message, $dbh) = @_;
+	my ($address, $pattern) = @_;
+
+	$pattern =~ s/\@/\\@/g;
+	$pattern =~ s/\+/\\+/g;
+	$pattern =~ s/\./\\./g;
+	$pattern =~ s/\*/.*/g;
+
+	return $address =~ /^$pattern$/;
+}
+
+sub viruscheck
+{
+	my ($self, $message) = @_;
 
 	my $socket = new IO::Socket::INET(
 		PeerAddr => 'localhost',
@@ -256,50 +259,72 @@ sub CheckVirus
 		Timeout => 5)
 		or die $@;
 
-	print $stream $$message;
+	print $stream @$message;
 	$stream->close;
 	$response = <$socket>;
 	$socket->close;
 	chomp $response;
 	if ($response =~ /(\S+)\s+FOUND$/) {
 		my $virus = $1;
-		my ($envelopeFrom, @envelopeTo) = ProcessEnvelope($envelope);
+		my $dbh = $self->getAttribute('dbh');
 		my $sth = $dbh->prepare(
 			'INSERT INTO viruses
 				(mail_from, ip_address, contents, virus, created)
 				VALUES (?, ?, ?, ?, NOW())');
-		$sth->execute($envelopeFrom, $ENV{TCPREMOTEIP}, $$message, $virus);
+		$sth->execute($self->getMailFrom, $self->getAttribute('remoteAddr'),
+			join('', @$message), $virus);
 
 		$sth = $dbh->prepare(
 			'INSERT INTO virus_recipients (recipient, virus_id)
 				VALUES (?, CURRVAL(\'viruses_id_seq\'))');
 
-		map { $sth->execute($_) } @envelopeTo;
-		return 1;
+		map { $sth->execute($_) } @{$self->getRcptTo};
+
+		# Reject the message.
+		$self->setErrorResponse(
+			'550 Message contains a virus and was rejected');
+		return undef;
 	}
 
-	return undef;
+	return 1;
 }
 
-sub acceptAddress
+
+package main;
+
+use Config::IniFiles;
+
+main();
+
+sub main
 {
-	my ($address, $pattern) = @_;
+	# Open a connection to the database.
+	my $cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
+	my $dsn = $cfg->val('AutoWhitelist', 'dsn');
+	my $user = $cfg->val('AutoWhitelist', 'user');
+	my $password = $cfg->val('AutoWhitelist', 'password');
+	my $dbh = DBI->connect($dsn, $user, $password,
+		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
 
-	$pattern =~ s/\@/\\@/g;
-	$pattern =~ s/\+/\\+/g;
-	$pattern =~ s/\./\\./g;
-	$pattern =~ s/\*/.*/g;
-
-	return $address =~ /^$pattern$/;
-}
-
-sub isAddressWhitelisted
-{
-	my ($address, $whitelist) = @_;
-
-	foreach (@$whitelist) {
-		return 1 if acceptAddress($address, $_->[0]);
+	# Open a log file for debugging if debugging has been specified.
+	my $debug = $cfg->val('General', 'debug');
+	if ($debug) {
+		close STDERR;
+		open STDERR, ">>$home/spamfilter.$$.log";
+		STDERR->autoflush(1);
 	}
 
-	return undef;
+	# Create the SMTP proxy and process the message.
+	my $proxy = new SpamFilter(
+		PeerAddr => $cfg->val('General', 'smtpServer'),
+		PeerPort => $cfg->val('General', 'smtpPort'),
+		Home => $home,
+		Config => $cfg,
+		Dbh => $dbh);
+
+	$proxy->debug(1) if $debug;
+
+	print STDERR "Calling processMessage\n" if $debug;
+	$proxy->processMessage;
+	$dbh->disconnect;
 }
