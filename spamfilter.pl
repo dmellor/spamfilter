@@ -13,14 +13,14 @@ BEGIN {
 
 package SpamFilter;
 
-use BeforeQueueProxy;
+use AfterQueueProxy;
 use MySpamAssassin;
 use SqlAutoWhitelist;
 use Mail::SpamAssassin::Message;
 use DBI;
 use IO::Socket::INET;
 
-our @ISA = qw(BeforeQueueProxy);
+our @ISA = qw(AfterQueueProxy);
 
 sub checkMessage
 {
@@ -158,7 +158,7 @@ sub spamcheck
 
 	# Reject the message.
 	$self->setErrorResponse(
-		'550 Message was identified as spam and is rejected');
+		'250 Message was identified as spam and is rejected');
 	return undef;
 }
 
@@ -282,7 +282,7 @@ sub viruscheck
 
 		# Reject the message.
 		$self->setErrorResponse(
-			'550 Message contains a virus and was rejected');
+			'250 Message contains a virus and was rejected');
 		return undef;
 	}
 
