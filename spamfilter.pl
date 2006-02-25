@@ -71,7 +71,7 @@ sub performChecks
 
 		print STDERR "Calling spamcheck\n" if $self->debug;
 		$ok = $self->spamcheck($message);
-		print STDERR "spamchek returned $ok\n" if $self->debug;
+		print STDERR "spamcheck returned $ok\n" if $self->debug;
 		if ($ok && $self->getAttribute('virusCheck')) {
 			print STDERR "Calling viruscheck\n" if $self->debug;
 			$ok = $self->viruscheck($message);
@@ -115,14 +115,11 @@ sub spamcheck
 	# If the all of the recipients are whitelisted, then accept the message.
 	my $dbh = $self->getArgument('Dbh');
 	my $sth = $dbh->prepare(
-		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content');
-	$sth->execute;
-	my $whitelistTo = $sth->fetchall_arrayref;
-	my @whitelistRcpts = grep {
-		isAddressWhitelisted(lc $_, $whitelistTo)
-	} @$envelopeTo;
-
-	if (scalar(@whitelistRcpts) == scalar(@$envelopeTo)) {
+		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content AND (' .
+		join(' OR ', map { '? ~ regexp' } @$envelopeTo) . ')');
+	$sth->execute(map { lc $_ } @$envelopeTo);
+	my $whitelistRcpts = $sth->fetchall_arrayref;
+	if (scalar(@$whitelistRcpts) == scalar(@$envelopeTo)) {
 		$self->setAttribute('virusCheck', 1);
 		return 1;
 	}
@@ -132,11 +129,6 @@ sub spamcheck
 	my $status = spamAssassinCheck($message, $envelopeTo, $factory);
 	if (!$status->is_spam) {
 		$self->setAttribute('virusCheck', 1);
-		return 1;
-	}
-	elsif ($status->get_hits < $cfg->val('General', 'rejectThreshold')) {
-		@$message = ($status->rewrite_mail);
-		$self->setAttribute('virusCheck', 0);
 		return 1;
 	}
 
@@ -154,7 +146,7 @@ sub spamcheck
 	$sth = $dbh->prepare(
 		'INSERT INTO saved_mail_recipients (recipient, saved_mail_id)
 			VALUES (?, CURRVAL(\'saved_mail_id_seq\'))');
-	map { $sth->execute($_) } @$envelopeTo;
+	map { $sth->execute(lc $_) } @$envelopeTo;
 
 	# Reject the message.
 	$self->setErrorResponse(
@@ -185,9 +177,8 @@ sub spamAssassinCheck
 	# Add the user-defined whitelists to the SpamAssassin configuration.
 	my $dbh = $factory->getDbHandle();
 	my $sth = $dbh->prepare(
-		'SELECT c.mail_from FROM user_addresses AS a JOIN
-			whitelist_from AS b ON a.user_id = b.user_id JOIN
-			mail_from_addresses AS c ON c.id = b.mail_from_id
+		'SELECT b.mail_from FROM user_addresses AS a JOIN
+			whitelist_from AS b ON a.user_id = b.user_id
 			WHERE a.address = ?');
 
 	foreach my $recipient (@$recipients) {
@@ -213,29 +204,6 @@ sub spamAssassinCheck
 	# Return the PerMsgStatus object that specifies the status of the
 	# message.
 	return $assassin->check($messageObj);
-}
-
-sub isAddressWhitelisted
-{
-	my ($address, $whitelist) = @_;
-
-	foreach (@$whitelist) {
-		return 1 if acceptAddress($address, $_->[0]);
-	}
-
-	return undef;
-}
-
-sub acceptAddress
-{
-	my ($address, $pattern) = @_;
-
-	$pattern =~ s/\@/\\@/g;
-	$pattern =~ s/\+/\\+/g;
-	$pattern =~ s/\./\\./g;
-	$pattern =~ s/\*/.*/g;
-
-	return $address =~ /^$pattern$/;
 }
 
 sub viruscheck

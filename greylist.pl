@@ -141,23 +141,20 @@ sub checkWhitelist
 	my ($dbh, $mailFrom, $rcptTo) = @_;
 
 	my $sth = $dbh->prepare(
-		'SELECT c.mail_from FROM user_addresses AS a JOIN
-			whitelist_from AS b ON a.user_id = b.user_id JOIN
-			mail_from_addresses AS c ON c.id = b.mail_from_id
-			WHERE a.address = ?');
-	$sth->execute($rcptTo);
-	my $row;
-	while ($row = $sth->fetchrow_arrayref) {
-		return ACCEPTED if acceptAddress($mailFrom, $row->[0]);
-	}
+		'SELECT COUNT(*) FROM user_addresses AS a JOIN
+			whitelist_from AS b ON a.user_id = b.user_id
+			WHERE a.address = ? AND ? ~ b.regexp');
+	$sth->execute(lc $rcptTo, lc $mailFrom);
+	my $row = $sth->fetchrow_arrayref;
+	return ACCEPTED if $row->[0];
 
 	# Check if the recipient address is whitelisted.
 	$sth = $dbh->prepare(
-		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_greylist');
-	$sth->execute;
-	while ($row = $sth->fetchrow_arrayref) {
-		return ACCEPTED if acceptAddress($rcptTo, $row->[0]);
-	}
+		q(SELECT COUNT(*) FROM whitelist_to WHERE NOT filter_greylist AND
+			? ~ regexp));
+	$sth->execute(lc $rcptTo);
+	$row = $sth->fetchrow_arrayref;
+	return ACCEPTED if $row->[0];
 
 	return undef;
 }
@@ -226,16 +223,4 @@ sub checkGreylist
 		$sth->execute($ip, $mailFrom, $rcptTo);
 		return REJECTED;
 	}
-}
-
-sub acceptAddress
-{
-	my ($address, $pattern) = @_;
-
-	$pattern =~ s/\@/\\@/g;
-	$pattern =~ s/\+/\\+/g;
-	$pattern =~ s/\./\\./g;
-	$pattern =~ s/\*/.*/g;
-
-	return $address =~ /^$pattern$/;
 }
