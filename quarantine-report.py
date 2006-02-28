@@ -11,7 +11,7 @@ import time
 import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 
-headers = """From: <do_not_reply@whistlingcat.com>
+headers = """From: <do_not_reply@${domain}>
 To: $recipient
 Date: $rfcdate
 Subject: Spam quarantine summary $subjectDate
@@ -31,7 +31,8 @@ $recipient
 <B>Spam Email Blocked by the $serverName Mail Server</B><P>
 Clicking on the "deliver" links below will cause the corresponding
 quarantined message to be delivered to your mailbox.
-<B>Spam is automatically purged from your quarantine queue after 14 days.</B><p>
+<B>Spam is automatically purged from your quarantine queue after 14 days,
+freeing you from having to do it manually.</B><p>
 </font></td></tr></table>
 <br><br>
 <table width="100%" cellspacing="0" cellpadding="1" border="0">
@@ -164,6 +165,7 @@ def _sendQuarantineReport(recipient, cursor):
     text = [headersTmpl.substitute(
         recipient=recipient,
         rfcdate=rfc822str(curDate),
+        domain=domain,
         subjectDate=curDate.strftime("%m/%d/%Y %I:%M %p"))]
     preambleTmpl = string.Template(preamble)
     if len(messages) == 1:
