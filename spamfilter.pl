@@ -65,7 +65,6 @@ sub performChecks
 	my $ok;
 	eval {
 		if ($attempt == 0) {
-#			$dbh->do('LOCK TABLE auto_whitelist IN ACCESS EXCLUSIVE MODE');
 			$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 		}
 
@@ -120,6 +119,19 @@ sub spamcheck
 	$sth->execute(map { lc $_ } @$envelopeTo);
 	my $whitelistRcpts = $sth->fetchall_arrayref;
 	if (scalar(@$whitelistRcpts) == scalar(@$envelopeTo)) {
+		$self->setAttribute('virusCheck', 1);
+		return 1;
+	}
+
+	# If the envelope header is whitelisted to all of the recipients, then
+	# accept the message.
+	$sth = $dbh->prepare(
+		'SELECT COUNT(*) FROM whitelist_from AS a JOIN user_addresses AS b
+			ON a.user_id = b.user_id
+			WHERE ? ~ a.regexp AND (' .
+		join(' OR ', map { 'b.address = ?' } @$envelopeTo) . ')');
+	$sth->execute(lc $envelopeFrom, map { lc $_ } @$envelopeTo);
+	if ($sth->fetchrow_arrayref->[0] == scalar(@$envelopeTo)) {
 		$self->setAttribute('virusCheck', 1);
 		return 1;
 	}
@@ -266,13 +278,7 @@ main();
 
 sub main
 {
-	# Open a connection to the database.
 	my $cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
-	my $dsn = $cfg->val('AutoWhitelist', 'dsn');
-	my $user = $cfg->val('AutoWhitelist', 'user');
-	my $password = $cfg->val('AutoWhitelist', 'password');
-	my $dbh = DBI->connect($dsn, $user, $password,
-		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
 
 	# Open a log file for debugging if debugging has been specified.
 	my $debug = $cfg->val('General', 'debug');
@@ -281,6 +287,13 @@ sub main
 		open STDERR, ">>$home/spamfilter.$$.log";
 		STDERR->autoflush(1);
 	}
+
+	# Open a connection to the database.
+	my $dsn = $cfg->val('AutoWhitelist', 'dsn');
+	my $user = $cfg->val('AutoWhitelist', 'user');
+	my $password = $cfg->val('AutoWhitelist', 'password');
+	my $dbh = DBI->connect($dsn, $user, $password,
+		{ PrintError => 0, RaiseError => 1, AutoCommit => 0 });
 
 	# Create the SMTP proxy and process the message.
 	my $proxy = new SpamFilter(
