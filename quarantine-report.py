@@ -121,7 +121,8 @@ def main(database, user, password):
             except psycopg2.DatabaseError, e:
                 connection.rollback()
                 attempt += 1
-                print "Unable to send report to %s: %s" % (recipient, e)
+                if attempt == 5:
+                    print "Unable to send report to %s: %s" % (recipient, e)
                 time.sleep(10);
     
 def _sendQuarantineReport(recipient, cursor):
