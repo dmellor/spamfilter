@@ -8,6 +8,7 @@ import smtplib
 import md5
 import random
 import time
+import sys
 import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 
@@ -83,7 +84,7 @@ $msgDate
 </font>
 </td>
 <td><font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
-<a href="http://www.whistlingcat.com/cgi-bin/deliver/${deliveryId}">Deliver</a>
+<a href="http://${host}/cgi-bin/deliver/${deliveryId}">Deliver</a>
 </font></td>
 </tr>
 """
@@ -95,7 +96,7 @@ suffix = """</table>
 </html>
 """
 
-def main(database, user, password):
+def main(database, user, password, host):
     # Connect to the database and retrieve the addresses to which a delivery
     # message should be sent.
     connection = psycopg2.connect(database=database, user=user,
@@ -115,7 +116,7 @@ def main(database, user, password):
         attempt = 0
         while attempt < 5:
             try:
-                _sendQuarantineReport(recipient, cursor)
+                _sendQuarantineReport(recipient, cursor, host)
                 connection.commit()
                 break
             except psycopg2.DatabaseError, e:
@@ -125,7 +126,7 @@ def main(database, user, password):
                     print "Unable to send report to %s: %s" % (recipient, e)
                 time.sleep(10);
     
-def _sendQuarantineReport(recipient, cursor):
+def _sendQuarantineReport(recipient, cursor, host):
     # Determine the real recipient.
     cursor.execute(
         "SELECT delivery FROM quarantine_recipients WHERE %s ~ regexp",
@@ -198,7 +199,7 @@ def _sendQuarantineReport(recipient, cursor):
         text.append(
             rowTmpl.substitute(
                 mailFrom=mailFrom, subject=subject, msgDate=msgDate,
-                deliveryId=deliveryId, colour=colour))
+                deliveryId=deliveryId, colour=colour, host=host))
         cursor.execute(
             """UPDATE saved_mail_recipients SET delivery_id = %s
             WHERE recipient = %s AND saved_mail_id = %s""",
@@ -214,4 +215,4 @@ def _sendQuarantineReport(recipient, cursor):
     mailServer.quit()
     
 if __name__ == "__main__":
-    main("spamassassin", "qmail", "38hb75")
+    main(*sys.argv[1:])
