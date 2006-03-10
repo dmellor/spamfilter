@@ -95,7 +95,6 @@ sub performChecks
 	my $action;
 	eval {
 		if ($attempt == 0) {
-#			$dbh->do('LOCK TABLE greylist IN ACCESS EXCLUSIVE MODE');
 			$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 		}
 
@@ -179,24 +178,26 @@ sub checkGreylist
 	# the same server, but they all seem to be within the same class C network.
 	if (!defined($id)) {
 		my ($domain) = $mailFrom =~ /\@(.*)$/;
-		$sth = $dbh->prepare(
-			'SELECT COUNT(*) FROM classc_domains WHERE domain = ?');
-		$sth->execute($domain);
-		my $row = $sth->fetchrow_arrayref;
-		if ($row->[0]) {
+		if ($domain) {
 			$sth = $dbh->prepare(
-				q(SELECT id,
-					CASE NOW() - created > INTERVAL '1 hour'
-						WHEN TRUE THEN 1
-						ELSE 0
-					END
-					FROM greylist
-					WHERE SUBSTRING(ip_address FROM '^[0-9]+\.[0-9]+\.[0-9]+')
-						= ?
-					AND mail_from = ? AND rcpt_to = ?));
-			my ($network) = $ip =~ /^([0-9]+\.[0-9]+\.[0-9]+)/;
-			$sth->execute($network, $mailFrom, $rcptTo);
-			($id, $expired) = $sth->fetchrow_array;
+				'SELECT COUNT(*) FROM classc_domains WHERE domain = ?');
+			$sth->execute($domain);
+			my $row = $sth->fetchrow_arrayref;
+			if ($row->[0]) {
+				$sth = $dbh->prepare(
+					q(SELECT id,
+						CASE NOW() - created > INTERVAL '1 hour'
+							WHEN TRUE THEN 1
+							ELSE 0
+						END
+						FROM greylist
+						WHERE SUBSTRING(ip_address FROM
+							'^[0-9]+\.[0-9]+\.[0-9]+') = ?
+						AND mail_from = ? AND rcpt_to = ?));
+				my ($network) = $ip =~ /^([0-9]+\.[0-9]+\.[0-9]+)/;
+				$sth->execute($network, $mailFrom, $rcptTo);
+				($id, $expired) = $sth->fetchrow_array;
+			}
 		}
 	}
 
