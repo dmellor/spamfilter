@@ -44,47 +44,54 @@ sub process
 	my ($ip, $mailFrom, $rcptTo, $helo);
 	while (<STDIN>) {
 		print STDERR "Read: $_" if $debug;
-		last if $_ eq "\n";
-		chomp;
-		my ($name, $value) = /^([^=]*)=(.*)/;
-		if ($name eq 'client_address') {
-			$ip = $value;
-			print STDERR "ip is $ip\n" if $debug;
+		if ($_ ne "\n") {
+			chomp;
+			my ($name, $value) = /^([^=]*)=(.*)/;
+			if ($name eq 'client_address') {
+				$ip = $value;
+				print STDERR "ip is $ip\n" if $debug;
+			}
+			elsif ($name eq 'sender') {
+				$mailFrom = $value;
+				print STDERR "mailFrom is $mailFrom\n" if $debug;
+			}
+			elsif ($name eq 'recipient') {
+				$rcptTo = $value;
+				print STDERR "rcptTo is $rcptTo\n" if $debug;
+			}
+			elsif ($name eq 'helo_name') {
+				$helo = $value;
+				print STDERR "helo is $helo\n" if $debug;
+			}
 		}
-		elsif ($name eq 'sender') {
-			$mailFrom = $value;
-			print STDERR "mailFrom is $mailFrom\n" if $debug;
-		}
-		elsif ($name eq 'recipient') {
-			$rcptTo = $value;
-			print STDERR "rcptTo is $rcptTo\n" if $debug;
-		}
-		elsif ($name eq 'helo_name') {
-			$helo = $value;
-			print STDERR "helo is $helo\n" if $debug;
-		}
-	}
+		else {
+			my $retries = 0;
+			my $action;
+			my $retry;
+			my $status;
+			while ($retries < 2) {
+				($action, $retry, $status) = performChecks($dbh, $retries, $ip,
+					$mailFrom, $rcptTo, $helo);
+				last unless $retry;
+				$retries++;
+				sleep 10;
+			}
 
-	my $retries = 0;
-	my $action;
-	my $retry;
-	my $status;
-	while ($retries < 2) {
-		($action, $retry, $status) = performChecks($dbh, $retries, $ip,
-			$mailFrom, $rcptTo, $helo);
-		last unless $retry;
-		$retries++;
-		sleep 10;
-	}
-		
-	if ($status) {
-		$status =~ tr/\n/_/;
-		print "action=451 $status\n\n";
-		print STDERR "action=451 $status\n\n" if $debug;
-	}
-	else {
-		print "action=$action\n\n";
-		print STDERR "action=$action\n\n" if $debug;
+			if ($status) {
+				$status =~ tr/\n/_/;
+				print "action=451 $status\n\n";
+				print STDERR "action=451 $status\n\n" if $debug;
+			}
+			else {
+				print "action=$action\n\n";
+				print STDERR "action=$action\n\n" if $debug;
+			}
+
+			$ip = undef;
+			$mailFrom = undef;
+			$rcptTo = undef;
+			$helo = undef;
+		}
 	}
 }
 
