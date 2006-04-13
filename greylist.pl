@@ -120,6 +120,8 @@ sub updateDB
 		'INSERT INTO logs (ip_address, mail_from, rcpt_to, helo, created)
 			VALUES (?, ?, ?, ?, NOW())');
 	$logSth->execute($ip, $mailFrom, $rcptTo, $helo);
+	$mailFrom = lc $mailFrom;
+	$rcptTo = lc $rcptTo;
 
 	# Check if the sender or recipient address is whitelisted.
 	my $isWhitelisted = checkWhitelist($dbh, $mailFrom, $rcptTo);
