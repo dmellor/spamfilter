@@ -33,11 +33,11 @@ sub checkMessage
 	my $addr = $self->getAttribute('remoteAddr');
 	my $cfg = $self->getArgument('Config');
 	my $db = $cfg->val('General', 'popDb');
-#	open POSTMAP, "/usr/sbin/postmap -q $addr $db |"
-#		or die 'Could not access db';
-#	my $line = <POSTMAP>;
-#	close POSTMAP;
-#	return 1 if $line =~ /^ok/;
+	open POSTMAP, "/usr/sbin/postmap -q $addr $db |"
+		or die 'Could not access db';
+	my $line = <POSTMAP>;
+	close POSTMAP;
+	return 1 if $line =~ /^ok/;
 
 	# The client is an external client - perform the spam and virus checks.
 	my $dbh = $self->getArgument('Dbh');
