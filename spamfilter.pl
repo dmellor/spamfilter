@@ -109,16 +109,16 @@ sub spamcheck
 
 	# Determine who sent the mail and to whom it is to be delivered.
 	my $envelopeFrom = $self->getMailFrom;
-	my $envelopeTo = $self->getRcptTo;
+	my @envelopeTo = $self->getUniqueRecipients;
 
 	# If the all of the recipients are whitelisted, then accept the message.
 	my $dbh = $self->getArgument('Dbh');
 	my $sth = $dbh->prepare(
 		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content AND (' .
-		join(' OR ', map { '? ~ regexp' } @$envelopeTo) . ')');
-	$sth->execute(map { lc $_ } @$envelopeTo);
+		join(' OR ', map { '? ~ regexp' } @envelopeTo) . ')');
+	$sth->execute(@envelopeTo);
 	my $whitelistRcpts = $sth->fetchall_arrayref;
-	if (scalar(@$whitelistRcpts) == scalar(@$envelopeTo)) {
+	if (scalar(@$whitelistRcpts) == scalar(@envelopeTo)) {
 		$self->setAttribute('virusCheck', 1);
 		return 1;
 	}
@@ -129,16 +129,16 @@ sub spamcheck
 		'SELECT COUNT(*) FROM whitelist_from AS a JOIN user_addresses AS b
 			ON a.user_id = b.user_id
 			WHERE ? ~ a.regexp AND (' .
-		join(' OR ', map { 'b.address = ?' } @$envelopeTo) . ')');
-	$sth->execute(lc $envelopeFrom, map { lc $_ } @$envelopeTo);
-	if ($sth->fetchrow_arrayref->[0] == scalar(@$envelopeTo)) {
+		join(' OR ', map { 'b.address = ?' } @envelopeTo) . ')');
+	$sth->execute($envelopeFrom, @envelopeTo);
+	if ($sth->fetchrow_arrayref->[0] == scalar(@envelopeTo)) {
 		$self->setAttribute('virusCheck', 1);
 		return 1;
 	}
 
 	# Check the message and accept it if it is not spam.
 	my $factory = new SqlAutoWhitelist($dbh);
-	my $status = spamAssassinCheck($message, $envelopeTo, $factory);
+	my $status = spamAssassinCheck($message, \@envelopeTo, $factory);
 	if (!$status->is_spam) {
 		$self->setAttribute('virusCheck', 1);
 		return 1;
@@ -158,7 +158,7 @@ sub spamcheck
 	$sth = $dbh->prepare(
 		'INSERT INTO saved_mail_recipients (recipient, saved_mail_id)
 			VALUES (?, CURRVAL(\'saved_mail_id_seq\'))');
-	map { $sth->execute(lc $_) } @$envelopeTo;
+	map { $sth->execute($_) } @envelopeTo;
 
 	# Reject the message.
 	$self->setErrorResponse(
@@ -258,7 +258,7 @@ sub viruscheck
 			'INSERT INTO virus_recipients (recipient, virus_id)
 				VALUES (?, CURRVAL(\'viruses_id_seq\'))');
 
-		map { $sth->execute($_) } @{$self->getRcptTo};
+		map { $sth->execute($_) } $self->getUniqueRecipients;
 
 		# Reject the message.
 		$self->setErrorResponse(
@@ -269,6 +269,15 @@ sub viruscheck
 	return 1;
 }
 
+sub getUniqueRecipients
+{
+	my $self = shift;
+
+	my $recips = $self->getRcptTo;
+	my %hash = map { ($_, 1) } @$recips;
+
+	return keys %hash;
+}
 
 package main;
 
