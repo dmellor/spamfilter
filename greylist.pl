@@ -11,13 +11,13 @@ use constant ACCEPTED => 'dunno';
 use constant REJECTED =>
 	'defer_if_permit System temporarily unavailable, please try again later';
 
+my $home = shift;
+my $cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
 STDOUT->autoflush(1);
-main(@ARGV);
+main();
 
 sub main
 {
-	my $home = shift;
-	my $cfg = new Config::IniFiles(-file => "$home/spamfilter.ini");
 	my $dsn = $cfg->val('Greylist', 'dsn');
 	my $user = $cfg->val('Greylist', 'user');
 	my $password = $cfg->val('Greylist', 'password');
@@ -130,7 +130,7 @@ sub updateDB
 	$mailFrom = lc $mailFrom;
 	$rcptTo = lc $rcptTo;
 
-	# Check if the sender or recipient address is whitelisted.
+	# Check if the sender address is whitelisted.
 	my $isWhitelisted = checkWhitelist($dbh, $mailFrom, $rcptTo);
 
 	# Update the greylist table. We do this even if the sender or recipient
@@ -154,17 +154,7 @@ sub checkWhitelist
 			WHERE a.address = ? AND ? ~ b.regexp');
 	$sth->execute(lc $rcptTo, lc $mailFrom);
 	my $row = $sth->fetchrow_arrayref;
-	return ACCEPTED if $row->[0];
-
-	# Check if the recipient address is whitelisted.
-	$sth = $dbh->prepare(
-		q(SELECT COUNT(*) FROM whitelist_to WHERE NOT filter_greylist AND
-			? ~ regexp));
-	$sth->execute(lc $rcptTo);
-	$row = $sth->fetchrow_arrayref;
-	return ACCEPTED if $row->[0];
-
-	return undef;
+	return $row->[0] ? ACCEPTED : undef;
 }
 
 sub checkGreylist
@@ -174,13 +164,15 @@ sub checkGreylist
 	# Check if the tuple has been seen before.
 	my $sth = $dbh->prepare(
 		q(SELECT id,
-			CASE NOW() - created > INTERVAL '1 hour'
+			CASE NOW() - created > INTERVAL ?
 				WHEN TRUE THEN 1
 				ELSE 0
 			END
 			FROM greylist WHERE ip_address = ? AND mail_from = ? AND
 				rcpt_to = ?));
-	$sth->execute($ip, $mailFrom, $rcptTo);
+	my $interval = $cfg->val('Greylist', 'interval');
+	die 'Invalid interval' unless $interval =~ /^\d+$/;
+	$sth->execute("$interval minutes", $ip, $mailFrom, $rcptTo);
 	my ($id, $expired) = $sth->fetchrow_array;
 
 	# Special case for certain domains. The retries do not always come from
@@ -195,7 +187,7 @@ sub checkGreylist
 			if ($row->[0]) {
 				$sth = $dbh->prepare(
 					q(SELECT id,
-						CASE NOW() - created > INTERVAL '1 hour'
+						CASE NOW() - created > INTERVAL ?
 							WHEN TRUE THEN 1
 							ELSE 0
 						END
@@ -204,7 +196,8 @@ sub checkGreylist
 							'^[0-9]+\.[0-9]+\.[0-9]+') = ?
 						AND mail_from = ? AND rcpt_to = ?));
 				my ($network) = $ip =~ /^([0-9]+\.[0-9]+\.[0-9]+)/;
-				$sth->execute($network, $mailFrom, $rcptTo);
+				$sth->execute("$interval minutes", $network, $mailFrom,
+					$rcptTo);
 				($id, $expired) = $sth->fetchrow_array;
 			}
 		}

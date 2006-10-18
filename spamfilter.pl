@@ -111,21 +111,10 @@ sub spamcheck
 	my $envelopeFrom = $self->getMailFrom;
 	my @envelopeTo = $self->getUniqueRecipients;
 
-	# If the all of the recipients are whitelisted, then accept the message.
-	my $dbh = $self->getArgument('Dbh');
-	my $sth = $dbh->prepare(
-		'SELECT rcpt_to FROM whitelist_to WHERE NOT filter_content AND (' .
-		join(' OR ', map { '? ~ regexp' } @envelopeTo) . ')');
-	$sth->execute(@envelopeTo);
-	my $whitelistRcpts = $sth->fetchall_arrayref;
-	if (scalar(@$whitelistRcpts) == scalar(@envelopeTo)) {
-		$self->setAttribute('virusCheck', 1);
-		return 1;
-	}
-
 	# If the envelope header is whitelisted to all of the recipients, then
 	# accept the message.
-	$sth = $dbh->prepare(
+	my $dbh = $self->getArgument('Dbh');
+	my $sth = $dbh->prepare(
 		'SELECT COUNT(*) FROM whitelist_from AS a JOIN user_addresses AS b
 			ON a.user_id = b.user_id
 			WHERE ? ~ a.regexp AND (' .
