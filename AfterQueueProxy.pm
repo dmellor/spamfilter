@@ -84,6 +84,11 @@ sub processMessage
 		}
 		elsif ($command[0] eq 'DATA') {
 			$self->data(@command);
+
+			# Reset the rcptTo and mailFrom attributes in case more than one
+			# message is being processed.
+			${*$self}{rcptTo} = [];
+			delete ${*$self}{mailFrom};
 		}
 		else {
 			$self->sendCommandAndResponse(@command);
