@@ -108,6 +108,7 @@ sub sendCommandAndResponse
 	}
 	else {
 		print "221 Proxy closing transmission channel\r\n";
+		exit;
 	}
 }
 
