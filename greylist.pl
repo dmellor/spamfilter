@@ -31,13 +31,13 @@ sub main
 		STDERR->autoflush(1);
 	}
 
-	process($dbh, $debug);
+	process($dbh, $debug, $cfg);
 	$dbh->disconnect;
 }
 
 sub process
 {
-	my ($dbh, $debug) = @_;
+	my ($dbh, $debug, $cfg) = @_;
 
 	# Extract the greylist information from the policy delegation information
 	# sent by Postfix.
@@ -71,7 +71,7 @@ sub process
 			my $status;
 			while ($retries < 2) {
 				($action, $retry, $status) = performChecks($dbh, $retries, $ip,
-					$mailFrom, $rcptTo, $helo);
+					$mailFrom, $rcptTo, $helo, $cfg);
 				last unless $retry;
 				$retries++;
 				sleep 10;
@@ -97,7 +97,7 @@ sub process
 
 sub performChecks
 {
-	my ($dbh, $attempt, $ip, $mailFrom, $rcptTo, $helo) = @_;
+	my ($dbh, $attempt, $ip, $mailFrom, $rcptTo, $helo, $cfg) = @_;
 
 	my $action;
 	eval {
@@ -105,7 +105,7 @@ sub performChecks
 			$dbh->do('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 		}
 
-		$action = updateDB($dbh, $ip, $mailFrom, $rcptTo, $helo);
+		$action = updateDB($dbh, $ip, $mailFrom, $rcptTo, $helo, $cfg);
 	}; 
 
 	my $status = $@;
@@ -121,7 +121,7 @@ sub performChecks
 
 sub updateDB
 {
-	my ($dbh, $ip, $mailFrom, $rcptTo, $helo) = @_;
+	my ($dbh, $ip, $mailFrom, $rcptTo, $helo, $cfg) = @_;
 
 	my $logSth = $dbh->prepare(
 		'INSERT INTO logs (ip_address, mail_from, rcpt_to, helo, created)
@@ -138,7 +138,7 @@ sub updateDB
 	# populated for those addresses. This allows greylisting to be enabled in
 	# the future for those addresses without causing any delay in the
 	# acceptance of mail.
-	my $greylistStatus = checkGreylist($dbh, $ip, $mailFrom, $rcptTo);
+	my $greylistStatus = checkGreylist($dbh, $ip, $mailFrom, $rcptTo, $cfg);
 
 	# The whitelist status takes precedence over the greylist status.
 	return $isWhitelisted || $greylistStatus;
@@ -159,7 +159,7 @@ sub checkWhitelist
 
 sub checkGreylist
 {
-	my ($dbh, $ip, $mailFrom, $rcptTo) = @_;
+	my ($dbh, $ip, $mailFrom, $rcptTo, $cfg) = @_;
 
 	# Check if the tuple has been seen before.
 	my $sth = $dbh->prepare(
@@ -203,6 +203,25 @@ sub checkGreylist
 		}
 	}
 
+	# If the number of successful connections from a domain has been achieved,
+	# then we accept the connection.
+	my $auto_accept;
+	if (!defined($id)) {
+		my $auto_threshold = $cfg->val('Greylist', 'auto_threshold');
+		if ($auto_threshold) {
+			$sth = $dbh->prepare(
+				'SELECT SUM(successful) FROM greylist
+					WHERE ip_address = ? AND rcpt_to = ? AND
+						mail_from LIKE ?');
+			my ($domain) = $mailFrom =~ /\@(.*)$/;
+			if ($domain) {
+				$sth->execute($ip, $rcptTo, "%\@$domain");
+				my ($num) = $sth->fetchrow_array;
+				$auto_accept = defined($num) && $num >= $auto_threshold;
+			}
+		}
+	}
+
 	if (defined($id) && $expired) {
 		$sth = $dbh->prepare(
 			'UPDATE greylist SET modified = NOW(), successful = successful + 1
@@ -217,6 +236,14 @@ sub checkGreylist
 				WHERE id = ?');
 		$sth->execute($id);
 		return REJECTED;
+	}
+	elsif ($auto_accept) {
+		$sth = $dbh->prepare(
+			'INSERT INTO greylist
+				(ip_address, mail_from, rcpt_to, created, successful)
+				VALUES (?, ?, ?, NOW(), 1)');
+		$sth->execute($ip, $mailFrom, $rcptTo);
+		return ACCEPTED;
 	}
 	else {
 		$sth = $dbh->prepare(
