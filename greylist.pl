@@ -224,32 +224,29 @@ sub checkGreylist
 
 	if (defined($id) && $expired) {
 		$sth = $dbh->prepare(
-			'UPDATE greylist SET modified = NOW(), successful = successful + 1
-				WHERE id = ?');
+			'UPDATE greylist SET successful = successful + 1 WHERE id = ?');
 		$sth->execute($id);
 		return ACCEPTED;
 	}
 	elsif (defined($id)) {
 		$sth = $dbh->prepare(
-			'UPDATE greylist SET modified = NOW(),
-				unsuccessful = unsuccessful + 1
+			'UPDATE greylist SET unsuccessful = unsuccessful + 1
 				WHERE id = ?');
 		$sth->execute($id);
 		return REJECTED;
 	}
 	elsif ($auto_accept) {
 		$sth = $dbh->prepare(
-			'INSERT INTO greylist
-				(ip_address, mail_from, rcpt_to, created, successful)
-				VALUES (?, ?, ?, NOW(), 1)');
+			'INSERT INTO greylist (ip_address, mail_from, rcpt_to, successful)
+				VALUES (?, ?, ?, 1)');
 		$sth->execute($ip, $mailFrom, $rcptTo);
 		return ACCEPTED;
 	}
 	else {
 		$sth = $dbh->prepare(
 			'INSERT INTO greylist
-				(ip_address, mail_from, rcpt_to, created, unsuccessful)
-				VALUES (?, ?, ?, NOW(), 1)');
+				(ip_address, mail_from, rcpt_to, unsuccessful)
+				VALUES (?, ?, ?, 1)');
 		$sth->execute($ip, $mailFrom, $rcptTo);
 		return REJECTED;
 	}

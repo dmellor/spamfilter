@@ -170,7 +170,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE user_addresses TO qmail;
 SET SESSION AUTHORIZATION 'david';
 
 --
--- TOC entry 58 (OID 17526)
+-- TOC entry 59 (OID 17526)
 -- Name: stamp(); Type: FUNCTION; Schema: public; Owner: david
 --
 
@@ -178,11 +178,6 @@ CREATE FUNCTION stamp() RETURNS "trigger"
     AS '
 BEGIN
 	NEW.modified := ''now'';
-
-	IF TG_OP = ''INSERT'' AND NEW.created IS NULL THEN
-		NEW.created := NEW.modified;
-	END IF;
-
 	RETURN NEW;
 END;
 '
@@ -190,7 +185,7 @@ END;
 
 
 --
--- TOC entry 59 (OID 17527)
+-- TOC entry 58 (OID 17527)
 -- Name: extract_header(text, text); Type: FUNCTION; Schema: public; Owner: david
 --
 
@@ -229,8 +224,8 @@ CREATE TABLE greylist (
     ip_address character varying(15) NOT NULL,
     mail_from character varying(1024) NOT NULL,
     rcpt_to character varying(1024) NOT NULL,
-    created timestamp with time zone NOT NULL,
-    modified timestamp with time zone,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    modified timestamp with time zone NOT NULL,
     successful integer DEFAULT 0,
     unsuccessful integer DEFAULT 0
 );
@@ -400,7 +395,7 @@ CREATE TABLE auto_whitelist (
     score double precision DEFAULT (0)::double precision NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     modified timestamp without time zone NOT NULL,
-    created timestamp without time zone NOT NULL
+    created timestamp without time zone DEFAULT now() NOT NULL
 );
 
 
@@ -763,18 +758,7 @@ ALTER TABLE ONLY virus_recipients
 
 
 --
--- TOC entry 69 (OID 21621)
--- Name: auto_whitelist_stamp; Type: TRIGGER; Schema: public; Owner: david
---
-
-CREATE TRIGGER auto_whitelist_stamp
-    BEFORE INSERT OR UPDATE ON auto_whitelist
-    FOR EACH ROW
-    EXECUTE PROCEDURE stamp();
-
-
---
--- TOC entry 68 (OID 148905)
+-- TOC entry 69 (OID 148905)
 -- Name: whitelist_from_regexp; Type: TRIGGER; Schema: public; Owner: david
 --
 
@@ -785,7 +769,7 @@ CREATE TRIGGER whitelist_from_regexp
 
 
 --
--- TOC entry 70 (OID 301323)
+-- TOC entry 71 (OID 301323)
 -- Name: quarantine_recipients_regexp; Type: TRIGGER; Schema: public; Owner: david
 --
 
@@ -793,6 +777,28 @@ CREATE TRIGGER quarantine_recipients_regexp
     BEFORE INSERT OR UPDATE ON quarantine_recipients
     FOR EACH ROW
     EXECUTE PROCEDURE convert_original();
+
+
+--
+-- TOC entry 70 (OID 320730)
+-- Name: auto_whitelist_stamp; Type: TRIGGER; Schema: public; Owner: david
+--
+
+CREATE TRIGGER auto_whitelist_stamp
+    BEFORE INSERT OR UPDATE ON auto_whitelist
+    FOR EACH ROW
+    EXECUTE PROCEDURE stamp();
+
+
+--
+-- TOC entry 68 (OID 320732)
+-- Name: greylist_stamp; Type: TRIGGER; Schema: public; Owner: david
+--
+
+CREATE TRIGGER greylist_stamp
+    BEFORE INSERT OR UPDATE ON greylist
+    FOR EACH ROW
+    EXECUTE PROCEDURE stamp();
 
 
 SET SESSION AUTHORIZATION 'postgres';
