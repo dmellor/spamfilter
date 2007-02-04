@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.5
 # $Id$
 
 import psycopg2
@@ -191,8 +191,16 @@ def _sendQuarantineReport(recipient, cursor, host):
         mailFrom, subject, msgDate, msgId = msg
         msgDate = msgDate.replace(microsecond=0)
         digest = md5.new()
-        digest.update(mailFrom)
-        digest.update(subject)
+
+		# The mailFrom header can be null, if the spam was impersonating a
+		# bounce message.
+        if mailFrom:
+            digest.update(mailFrom)
+
+        # The subject can be null in some incorrectly formatted Asian spam.
+        if subject:
+            digest.update(subject)
+
         digest.update(str(msgDate))
         digest.update(str(random.random()))
         deliveryId = digest.hexdigest()
