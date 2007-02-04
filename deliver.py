@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.5
 # $Id$
 
 import psycopg2
@@ -12,6 +12,13 @@ user = "qmail"
 password = "38hb75"
 
 def main():
+    method = os.getenv("REQUEST_METHOD")
+    if method == "GET":
+        _confirm("http://" + os.getenv("SERVER_NAME") +
+                 os.getenv("SCRIPT_NAME") + os.getenv("PATH_INFO"))
+    elif method != "POST":
+        sys.exit()
+        
     pathInfo = os.getenv("PATH_INFO")
     if pathInfo[0] != "/":
         _invalidId()
@@ -83,5 +90,16 @@ def _success():
     print "</body></html>"
     sys.exit()
     
+def _confirm(url):
+    print "Content-Type: text/html"
+    print
+    print "<html><head><title>Confirm Message Delivery</title></head>"
+    print "<body>"
+    print "<h2>Click the button to deliver the message to your mailbox.</h2>"
+    print "<form method='POST' enctype='application/x-www-form-urlencoded'"
+    print "action='%s'" % url, ">"
+    print "<input type='submit' value='Deliver message'></form></body></html>"
+    sys.exit()
+
 if __name__ == "__main__":
     main()
