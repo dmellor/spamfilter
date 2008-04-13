@@ -1,5 +1,3 @@
-# $Id$
-
 # This class can be used to implement a before-queue content filter for
 # Postfix. It sits between two SMTP servers, reading commands from one server
 # and passing them on unmodified to the second server, and then sending the

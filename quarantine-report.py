@@ -1,5 +1,4 @@
 #!/usr/bin/python2.5
-# $Id$
 
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_SERIALIZABLE

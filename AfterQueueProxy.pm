@@ -1,5 +1,3 @@
-# $Id$
-
 # This class can be used to implement an after-queue content filter for
 # Postfix. It sits between an SMTP client and an SMTP server, reading commands
 # from the client and passing them on unmodified to the server, and then
