@@ -1,3 +1,5 @@
+-- Run schema/convert_greylist.py before running this script.
+
 -- April 20, 2008.
 -- Add not null constraints.
 alter table greylist alter successful set not null;
