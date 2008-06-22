@@ -4,9 +4,6 @@ from sqlalchemy import *
 from sqlalchemy.orm import *
 from model import meta
 
-class Greylist(object):
-    pass
-
 greylist_table = Table(
     'greylist', meta,
     Column('id', Integer, Sequence('greylist_id_seq'), primary_key=True),
@@ -18,6 +15,25 @@ greylist_table = Table(
     Column('successful', Integer, PassiveDefault('0'), nullable=False),
     Column('unsuccessful', Integer, PassiveDefault('0'), nullable=False),
     UniqueConstraint('ip_address', 'mail_from', 'rcpt_to',
-                     name='gretylist_tuple'))
+                     name='greylist_tuple'))
 
-mapper(Greylist, greylist_table)
+def greylist(interval=None):
+
+    class Greylist(object):
+        pass
+
+    if interval:
+        mapper(Greylist, greylist_table, properties={
+            'accepted': column_property(
+                case(
+                    value=text("now() - created > interval '%s minutes'"
+                               % interval),
+                    whens=[('true', 1)],
+                    else_=0).label('accepted'))
+            })
+    else:
+        mapper(Greylist, greylist_table)
+
+    return Greylist
+
+__all__ = ['greylist', 'greylist_table']

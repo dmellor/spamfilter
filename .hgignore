@@ -1,1 +1,2 @@
-schema/spamassassin-Apr202008.gz
+syntax: glob
+schema/spamassassin-*.gz
