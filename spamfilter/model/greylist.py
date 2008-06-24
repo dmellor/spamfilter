@@ -8,7 +8,7 @@ greylist_table = Table(
     'greylist', meta,
     Column('id', Integer, Sequence('greylist_id_seq'), primary_key=True),
     Column('ip_address', String(15), nullable=False),
-    Column('mail_from', String(1024), nullable=False),
+    Column('mail_from', String(1024), nullable=True),
     Column('rcpt_to', String(1024), nullable=False),
     Column('created', TIMESTAMP, PassiveDefault(text('now()'))),
     Column('modified', TIMESTAMP),

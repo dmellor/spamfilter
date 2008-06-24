@@ -55,7 +55,7 @@ grant select, insert, update, delete on user_addresses to qmail;
 create table foo (
 	id integer,
 	ip_address varchar(11) not null,
-	mail_from varchar(1024) not null,
+	mail_from varchar(1024),
 	rcpt_to varchar(1024) not null,
 	created timestamp with time zone not null default now(),
 	modified timestamp with time zone not null,
@@ -69,6 +69,7 @@ insert into foo (id, ip_address, mail_from, rcpt_to, created, modified,
 drop table greylist;
 alter table foo rename to greylist;
 create sequence greylist_id_seq;
+grant select, insert, update, delete on greylist_id_seq to qmail;
 select setval('greylist_id_seq', (select max(id) from greylist));
 alter table greylist alter id set default nextval('greylist_id_seq');
 alter table greylist add primary key (id);
