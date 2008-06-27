@@ -2,7 +2,7 @@
 
 from sqlalchemy import *
 from sqlalchemy.orm import *
-from model import meta
+from spamfilter.model import meta
 
 class User(object):
     pass

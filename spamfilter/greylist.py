@@ -2,8 +2,8 @@ import sys
 import re
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
-from model.greylist import *
-from policy import Policy
+from spamfilter.model.greylist import *
+from spamfilter.policy import Policy
 
 Greylist = None
 
