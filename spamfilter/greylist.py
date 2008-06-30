@@ -1,7 +1,6 @@
 import sys
 import re
 from sqlalchemy import *
-from sqlalchemy.orm import sessionmaker
 from spamfilter.model.greylist import *
 from spamfilter.policy import Policy
 

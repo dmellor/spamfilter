@@ -1,0 +1,13 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+. bin/activate
+exec python -c '
+import sys
+import logging
+from spamfilter.spamcheck import SpamCheck
+SpamCheck(sys.argv[1]).processMessage()
+logging.debug("About to call sys.exit(0)")
+sys.exit(0)' config.ini

@@ -30,7 +30,7 @@ def main():
     cursor = connection.cursor()
     try:
         cursor.execute(
-            """SELECT recipient, saved_mail_id FROM saved_mail_recipients
+            """SELECT recipient, spam_id FROM spam_recipients
             WHERE delivery_id = %s""",
             [deliveryId])
         if cursor.rowcount == 0:
@@ -46,7 +46,7 @@ def main():
             recipient = cursor.fetchone()[0]
 
         cursor.execute(
-             "SELECT mail_from, contents FROM saved_mail WHERE id = %s",
+             "SELECT mail_from, contents FROM spam WHERE id = %s",
              [savedMailId])
         mailFrom, msg = cursor.fetchone()
         
@@ -56,16 +56,14 @@ def main():
         mailServer.quit()
 
         cursor.execute(
-            "DELETE FROM saved_mail_recipients WHERE delivery_id = %s",
+            "DELETE FROM spam_recipients WHERE delivery_id = %s",
             [deliveryId])
         cursor.execute(
-            """SELECT COUNT(*) FROM saved_mail_recipients
-            WHERE saved_mail_id = %s""",
+            """SELECT COUNT(*) FROM spam_recipients WHERE spam_id = %s""",
             [savedMailId])
         number = cursor.fetchone()[0]
         if number == 0:
-            cursor.execute("DELETE FROM saved_mail WHERE id = %s",
-                           [savedMailId])
+            cursor.execute("DELETE FROM spam WHERE id = %s", [savedMailId])
         
         connection.commit()
         _success()

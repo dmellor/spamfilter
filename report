@@ -1,0 +1,11 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+. bin/activate
+exec python -c '
+import sys
+from spamfilter.report import ReportGenerator
+ReportGenerator(sys.argv[1]).report()
+sys.exit(0)' config.ini

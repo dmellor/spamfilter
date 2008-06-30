@@ -1,9 +1,11 @@
 #!/bin/sh
 
+umask 002
 directory=${0%/*}
 cd $directory
 . bin/activate
 exec python -c '
 import sys
 from spamfilter.greylist import GreylistPolicy
-GreylistPolicy(sys.argv[1]).process()' config.ini
+GreylistPolicy(sys.argv[1]).process()
+sys.exit(0)' config.ini

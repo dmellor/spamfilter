@@ -3,7 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from model.greylist import greylist
+from spamfilter.model.greylist import greylist
 
 Session = sessionmaker(autoflush=False, transactional=True)
 Greylist = greylist()

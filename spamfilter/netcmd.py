@@ -36,9 +36,11 @@ class NetCommand(object):
         The Python file and socket objects are compatible with this class.
         """
         self.fp = fp
+        self.closed = False
 
     def close(self):
         self.fp.close()
+        self.closed = True
 
     def debug(self, level=None):
         """
@@ -59,7 +61,7 @@ class NetCommand(object):
         
         return oldval
     
-    def debug_text(self, out, text):
+    def debugText(self, out, text):
         """
         This method is called to print debugging information. text is the text
         being sent. The method should return the text to be printed. This is
@@ -69,16 +71,16 @@ class NetCommand(object):
         dummy = out    
         return text
 
-    def debug_print(self, out, text):
+    def debugPrint(self, out, text):
         """
         Prints debugging information. out denotes the direction, with True
-        being data being sent to the server. This method calls debug_text
+        being data being sent to the server. This method calls debugText
         before printing to STDERR.
         """
         if out:
-            sys.stderr.write('>>> %s' % self.debug_text(out, text))
+            sys.stderr.write('>>> %s' % self.debugText(out, text))
         else:
-            sys.stderr.write('<<< %s' % self.debug_text(out, text))
+            sys.stderr.write('<<< %s' % self.debugText(out, text))
         
         sys.stderr.flush()
 
@@ -106,7 +108,7 @@ class NetCommand(object):
         """
         return int(self.net_cmd_code.substring[0:1])
     
-    def set_status(self, code, resp):
+    def setStatus(self, code, resp):
         if not isinstance(resp, list):
             resp = [resp]
             
@@ -122,11 +124,11 @@ class NetCommand(object):
         try:
             fd = self.fp.fileno()
         except:
-            self.set_status('599', 'Connection closed')
+            self.setStatus('599', 'Connection closed')
             return
             
         if hasattr(self, 'net_cmd_last_ch'):
-            self.dataend()
+            self.dataEnd()
             
         if args:
             cmd = ' '.join([x.replace('\n', ' ') for x in args])
@@ -144,7 +146,7 @@ class NetCommand(object):
                     pass
             
             if self.debug():
-                self.debug_print(1, cmd)
+                self.debugPrint(1, cmd)
                 
             # Clear the response and set a fictitious response code.
             self.net_cmd_resp = []
@@ -173,7 +175,7 @@ class NetCommand(object):
         Returns None upon failure.
 
         NOTE: If you do use this method for any reason, please remember to add
-        some debug_print calls into your method.
+        some debugPrint calls into your method.
         """
         if not hasattr(self, 'net_cmd_lines'):
             self.net_cmd_lines = []
@@ -215,7 +217,7 @@ class NetCommand(object):
             
         self.net_cmd_lines.insert(0, line)
         
-    def parse_response(self, line):
+    def parseResponse(self, line):
         """
         This method is called by response as a method with one argument. It
         should return an array of 2 values, the 3-digit status code and a flag
@@ -244,9 +246,9 @@ class NetCommand(object):
                 return CMD_ERROR
             
             if self.debug():
-                self.debug_print(0, line)
+                self.debugPrint(0, line)
             
-            line, code, more = self.parse_response(line)
+            line, code, more = self.parseResponse(line)
             if code is None:
                 self.ungetline(line)
                 break
@@ -256,7 +258,7 @@ class NetCommand(object):
 
         return int(code[0:1])
     
-    def read_until_dot(self, fp=None):
+    def readUntilDot(self, fp=None):
         """
         Reads data from the remote server until a line consisting of a single
         '.'. Any lines starting with '..' will have one of the '.'s removed.
@@ -271,7 +273,7 @@ class NetCommand(object):
             if line is None: return None
             
             if self.debug() & 4:
-                self.debug_print(0, line)
+                self.debugPrint(0, line)
             
             match = dotend_pattern.search(line)
             if match: break
@@ -283,7 +285,7 @@ class NetCommand(object):
                 
         return array
     
-    def datasend(self, lines):
+    def dataSend(self, lines):
         """
         Sends data to the remote server, converting LF to CRLF. Any line
         starting with a '.' will be prefixed with another '.'.
@@ -304,7 +306,7 @@ class NetCommand(object):
         
         if self.debug():
             for b in re.split(r'\n', line):
-                self.debug_print(1, b + '\n')
+                self.debugPrint(1, b + '\n')
         
         if '\r' != '\015':
             line = line.replace('\r\n', '\015\012')
@@ -342,7 +344,7 @@ class NetCommand(object):
             
         return 1
     
-    def rawdatasend(self, lines):
+    def rawDataSend(self, lines):
         "Sends data to the remote server without performing any conversions."
         line = ''.join(lines)
         try:
@@ -382,11 +384,11 @@ class NetCommand(object):
             
         return 1
     
-    def dataend(self):
+    def dataEnd(self):
         """
         Ends the sending of data to the remote server. This is done by ensuring
         that the data already sent ends with CRLF then sending '.CRLF' to end
-        the transmission. Once this data has been sent dataend calls response
+        the transmission. Once this data has been sent dataEnd calls response
         and returns True if response returns CMD_OK.
         """
         try:
@@ -404,7 +406,7 @@ class NetCommand(object):
         tosend += '.\015\012'
         
         if self.debug():
-            self.debug_print(1, '.\n')
+            self.debugPrint(1, '.\n')
         
         os.write(fd, tosend)
         if hasattr(self, 'net_cmd_last_ch'):

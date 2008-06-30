@@ -1,22 +1,13 @@
 import re
 import sys
 import time
-from ConfigParser import ConfigParser
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from spamfilter.mixin import ConfigMixin, SessionMixin
 
-Session = sessionmaker(autoflush=False, transactional=True)
-
-class Policy(object):
+class Policy(ConfigMixin, SessionMixin):
     def __init__(self, config_file):
         self.values = {}
-        self.config = ConfigParser()
-        self.config.read(config_file)
-        engine = create_engine(self.config.get('database', 'dburi'),
-                               convert_unicode=False, echo=False)
-        self.session = Session(bind=engine.connect())
-        self.session.connection().execute(
-            'set transaction isolation level serializable')
+        self.readConfig(config_file)
+        self.createSession(self.getConfigItem('database', 'dburi'))
 
     def process(self):
         name_value = re.compile('^([^=]*)=(.*)')
@@ -41,6 +32,7 @@ class Policy(object):
                         break
                     except Exception, exc:
                         self.session.rollback()
+                        self.session.clear()
                         err_status = str(exc)
                         retries += 1
                         time.sleep(
@@ -57,9 +49,3 @@ class Policy(object):
 
     def processRequest(self):
         raise Exception('Implementation not found')
-
-    def getConfigItem(self, section, name, default):
-        try:
-            return self.config.get(section, name)
-        except:
-            return default
