@@ -194,8 +194,10 @@ class ReportGenerator(ConfigMixin, SessionMixin):
                     mail_from=msg.mail_from, subject=msg.subject,
                     msg_date=msg_date, delivery_id=delivery_id, colour=colour,
                     host=host))
-            for recipient in msg.recipients:
-                recipient.delivery_id = delivery_id
+            for spam_recipient in msg.recipients:
+                if spam_recipient.recipient == recipient:
+                    spam_recipient.delivery_id = delivery_id
+                    break
 
         msg_text.append(SUFFIX)
 
