@@ -71,6 +71,7 @@ alter table foo rename to spam;
 create sequence spam_id_seq;
 grant select, insert, update, delete on spam_id_seq to qmail;
 alter table spam alter id set default nextval('spam_id_seq');
+select setval('spam_id_seq', (select max(id) from spam));
 alter table spam add primary key (id);
 grant select, insert, update, delete on spam to qmail;
 alter table spam_recipients
