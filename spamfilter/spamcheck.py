@@ -1,4 +1,3 @@
-from sqlalchemy import create_engine
 from subprocess import *
 import socket
 import re
@@ -65,7 +64,7 @@ class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
 
     def checkSpam(self, message):
         # If the message is above a certain size, then automatically accept it.
-        max_len = self.getConfigItem('spamfilter', 'max_message_length')
+        max_len = int(self.getConfigItem('spamfilter', 'max_message_length'))
         if len(message) > max_len:
             return True
 
