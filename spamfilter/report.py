@@ -137,7 +137,7 @@ class ReportGenerator(ConfigMixin, SessionMixin):
         records = query.all()
 
         # Retrieve the spam, sorting it by creation date.
-        spam = [x.spam.one() for x in records]
+        spam = [x.spam for x in records]
         spam.sort(key=lambda x: x.created)
 
         # Extract the domain name from the recipient and determine the name of

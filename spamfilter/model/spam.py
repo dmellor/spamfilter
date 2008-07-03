@@ -36,8 +36,7 @@ mapper(SpamRecipient, spam_recipients_table)
 
 mapper(Spam, spam_table,
        properties={
-           'recipients': relation(SpamRecipient,
-                                  backref=backref('spam', lazy='dynamic')),
+           'recipients': relation(SpamRecipient, backref='spam'),
            'contents': deferred(spam_table.c.contents),
            'subject': column_property(
                func.extract_header(text("'Subject'"),
