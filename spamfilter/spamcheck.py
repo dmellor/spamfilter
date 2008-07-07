@@ -23,14 +23,22 @@ class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
     def checkMessage(self, message):
         # If the remote address is in the POP before SMTP table, then we do not
         # want to perform any checks.
-        addr = self.remote_addr
-        pop_db = self.getConfigItem('spamfilter', 'pop_db')
-        postmap = Popen('/usr/sbin/postmap -q %s %s' % (addr, pop_db),
-                        shell=True, stdout=PIPE)
-        line = postmap.stdout.readline()
-        postmap.wait()
-        if line.startswith('ok'):
+        pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
+        if pop_db and queryPostfixDB(pop_db, self.remote_addr):
             return True
+
+        # If the sender is whitelisted then we do not want to perform any
+        # checks. This is to prevent quarantining mail that SpamAssassin
+        # consistently and incorrectly flags as spam.
+        whitelist_db = self.getConfigItem('spamfilter', 'whitelist_db', None)
+        if whitelist_db and self.mail_from:
+            # First check the full address, and then check the domain.
+            if queryPostfixDB(whitelist_db, self.mail_from):
+                return True
+            else:
+                domain = self.mail_from.index('@') + 1
+                if queryPostfixDB(whitelist_db, self.mail_from[domain:]):
+                    return True
 
         # The client is an external client - perform the spam and virus checks.
         retries = 0
@@ -173,3 +181,10 @@ def checkClamav(message, host, port):
     response = s.recv(1024)
     match = re.search(r'(\S+)\s+FOUND$', response)
     return match.group(1) if match else None
+
+def queryPostfixDB(db, item):
+    postmap = Popen('/usr/sbin/postmap -q %s %s' % (item, db), shell=True,
+                    stdout=PIPE)
+    line = postmap.stdout.readline()
+    postmap.wait()
+    return line.startswith('ok')
