@@ -23,11 +23,8 @@ class SmtpProxy(netcmd.NetCommand):
     """
     def __init__(self, input=sys.stdin, output=sys.stdout, host='localhost',
                  port=25):
-        # Create the connection to the remote server and get the file
-        # descriptor from it.
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((host, port))
-        super(SmtpProxy, self).__init__(s)
+        self.host = host
+        self.port = port
         self.rcpt_to = []
         self.mail_from = None
         self.remote_addr = None
@@ -35,10 +32,20 @@ class SmtpProxy(netcmd.NetCommand):
         self.input = input
         self.output = output
         
+        # Open a connection to the remote server.
+        self.openConnection()
+
         # Send the initial greeting response from the second server to the
         # first server.
         self.sendResponse()
     
+    def openConnection(self):
+        # Create the connection to the remote server and get the file
+        # descriptor from it.
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((self.host, self.port))
+        self.open(s)
+
     def processMessage(self):
         while True:
             line = self.input.readline()
@@ -67,21 +74,34 @@ class SmtpProxy(netcmd.NetCommand):
             else:
                 self.sendCommandAndResponse(command)
         
-        if not self.error_response:
-            self.close()
-
     def sendCommandAndResponse(self, command):
-        if not self.closed and not self.error_response:
+        processed = False
+        if self.closed:
+            # If this point is reached then another message is being sent to
+            # remote server after the previous message was identified as spam.
+            # Open up a new connection to the remote server, discard the
+            # greeting and fake an EHLO command. However, if the command is
+            # QUIT, then we simply send a fake '221 Bye' response back to the
+            # first server.
+            if command[0] != 'QUIT':
+                self.openConnection()
+                self.sendResponse(discard=True)
+                self.command(['EHLO', 'localhost'])
+                self.sendResponse(discard=True)
+            else:
+                self.output.write('221 Bye\r\n')
+                self.output.flush()
+                processed = True
+
+        # Send the command and its response.
+        if not processed:
             self.command(command)
             self.sendResponse()
-        else:
-            self.output.write('221 Proxy closing transmission channel\r\n')
-            self.output.flush()
-            sys.exit(0)
     
-    def sendResponse(self):
+    def sendResponse(self, discard=False):
         self.response()
-        self.printResponse()
+        if not discard:
+            self.printResponse()
     
     def printResponse(self):
         # Get the response. NetCommand strips the code from each line and

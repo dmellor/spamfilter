@@ -35,6 +35,9 @@ class NetCommand(object):
         
         The Python file and socket objects are compatible with this class.
         """
+        self.open(fp)
+
+    def open(self, fp):
         self.fp = fp
         self.closed = False
 
@@ -270,13 +273,15 @@ class NetCommand(object):
         dotend_pattern = re.compile(r'^\.\r?\n')
         while True:
             line = self.getline()
-            if line is None: return None
+            if line is None:
+                return None
             
             if self.debug() & 4:
                 self.debugPrint(0, line)
             
             match = dotend_pattern.search(line)
-            if match: break
+            if match:
+                break
             
             if fp:
                 os.write(fp.fileno(), line)
