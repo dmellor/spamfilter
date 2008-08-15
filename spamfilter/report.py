@@ -133,7 +133,7 @@ class ReportGenerator(ConfigMixin, SessionMixin):
 
         # Retrieve the spam recipient records for this recipient.
         query = self.session.query(SpamRecipient)
-        query = query.filter_by(recipient=actual_recipient, delivery_id=None)
+        query = query.filter_by(recipient=recipient, delivery_id=None)
         records = query.all()
 
         # Retrieve the spam, sorting it by creation date.
