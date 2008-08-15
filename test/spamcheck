@@ -1,0 +1,10 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+exec /usr/bin/python2.5 -c '
+import sys
+from spamfilter.spamcheck import SpamCheck
+SpamCheck(sys.argv[1], host="granite").processMessage()
+sys.exit(0)' config.ini
