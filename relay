@@ -1,0 +1,11 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+. bin/activate
+exec python -c '
+import sys
+from spamfilter.relay import Relay
+Relay(host=sys.argv[1]).processMessage()
+sys.exit(0)' $1

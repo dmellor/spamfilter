@@ -65,7 +65,7 @@ class SmtpProxy(netcmd.NetCommand):
             elif command[0] == 'DATA':
                 self.data(command)
                 
-                # Rest the attributes in case more than one message is being
+                # Reset the attributes in case more than one message is being
                 # processed.
                 self.rcpt_to = []
                 self.mail_from = None
