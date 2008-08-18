@@ -28,9 +28,9 @@ class Relay(SmtpProxy):
             if name == 'SOURCE':
                 source_index = i
             elif name == 'HELO':
-                self.relay_helo = value
+                self.xclient_helo = value
             elif name == 'NAME':
-                self.relay_name = value
+                self.xclient_name = value
 
         if source_index != -1:
             del command[source_index]
@@ -52,14 +52,21 @@ class Relay(SmtpProxy):
             self.output.write('250 Ok\r\n')
             self.output.flush()
         elif command[0] == 'MAIL':
-            # Send the XCLIENT command, discard the response and then send the
+            name = self.xclient_helo
+            if not name:
+                name = self.xclient_name
+
+            # If there is a remote client name then the message was not
+            # injected onto the queue locally, in which case we send the
+            # XCLIENT command, discard the response and then send the
             # synthesised HELO command and discard its response before issuing
             # the mail command.
-            self.command(self.xclient_command)
-            self.sendResponse(discard=True)
-            name = self.relay_helo if self.relay_helo else self.relay_name
-            self.command(['HELO', name])
-            self.sendResponse(discard=True)
+            if name:
+                self.command(self.xclient_command)
+                self.sendResponse(discard=True)
+                self.command(['HELO', name])
+                self.sendResponse(discard=True)
+
             super(Relay, self).sendCommandAndResponse(command)
         else:
             super(Relay, self).sendCommandAndResponse(command)
