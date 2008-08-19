@@ -78,8 +78,8 @@ class SmtpProxy(netcmd.NetCommand):
         processed = False
         if self.closed:
             # If this point is reached then another message is being sent to
-            # remote server after the previous message was identified as spam.
-            # Open up a new connection to the remote server, discard the
+            # the remote server after the previous message was identified as
+            # spam. Open up a new connection to the remote server, discard the
             # greeting and fake an EHLO command. However, if the command is
             # QUIT, then we simply send a fake '221 Bye' response back to the
             # first server.

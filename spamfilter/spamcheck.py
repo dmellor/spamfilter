@@ -74,9 +74,7 @@ class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
         if len(message) > max_len:
             return True
 
-        ok = self.checkSpam(message)
-        if ok:
-            ok = self.checkVirus(message)
+        ok = self.checkSpam(message) and self.checkVirus(message)
 
         # If the message is spam or contains a virus then we ensure that its
         # corresponding greylist entry, if any, is removed.
