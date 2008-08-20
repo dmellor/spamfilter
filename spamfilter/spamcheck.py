@@ -199,7 +199,7 @@ def checkClamav(message, host, port):
     return match.group(1) if match else None
 
 def queryPostfixDB(db, item):
-    postmap = Popen('/usr/sbin/postmap -q %s %s' % (item, db), shell=True,
+    postmap = Popen(['/usr/sbin/postmap', '-q', item, db], shell=False,
                     stdout=PIPE)
     line = postmap.stdout.readline()
     postmap.wait()
