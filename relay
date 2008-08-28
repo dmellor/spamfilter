@@ -7,5 +7,5 @@ cd $directory
 exec python -c '
 import sys
 from spamfilter.relay import Relay
-Relay(host=sys.argv[1]).processMessage()
-sys.exit(0)' $1
+Relay(config=sys.argv[1], host=sys.argv[2]).processMessage()
+sys.exit(0)' config.ini $1

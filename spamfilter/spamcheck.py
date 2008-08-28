@@ -4,7 +4,7 @@ import re
 import time
 
 from spamfilter.smtpproxy import SmtpProxy
-from spamfilter.mixin import ConfigMixin, SessionMixin
+from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.greylist import *
@@ -18,10 +18,10 @@ class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
     """
     This class checks a message against spamd for spam and clamd for viruses.
     """
-    def __init__(self, config_file, **kws):
+    def __init__(self, config, **kws):
         global Greylist
         super(SpamCheck, self).__init__(**kws)
-        self.readConfig(config_file)
+        self.readConfig(config)
         self.createSession(self.getConfigItem('database', 'dburi'))
         Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
 
@@ -197,10 +197,3 @@ def checkClamav(message, host, port):
     response = s.recv(1024)
     match = re.search(r'(\S+)\s+FOUND$', response)
     return match.group(1) if match else None
-
-def queryPostfixDB(db, item):
-    postmap = Popen(['/usr/sbin/postmap', '-q', item, db], shell=False,
-                    stdout=PIPE)
-    line = postmap.stdout.readline()
-    postmap.wait()
-    return line.startswith('ok')

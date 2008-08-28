@@ -7,5 +7,5 @@ cd $directory
 exec python -c '
 import sys
 from spamfilter.spamcheck import SpamCheck
-SpamCheck(sys.argv[1]).processMessage()
+SpamCheck(config=sys.argv[1]).processMessage()
 sys.exit(0)' config.ini
