@@ -30,8 +30,11 @@ class SessionMixin(object):
 
 
 def queryPostfixDB(db, item):
-    from subprocess import Popen, PIPE
-    postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
-    line = postmap.stdout.readline()
-    postmap.wait()
-    return line.startswith('ok')
+    if item:
+        from subprocess import Popen, PIPE
+        postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
+        line = postmap.stdout.readline()
+        postmap.wait()
+        return line.startswith('ok')
+    else:
+        return False
