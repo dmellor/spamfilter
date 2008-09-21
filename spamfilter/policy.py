@@ -4,9 +4,9 @@ import time
 from spamfilter.mixin import ConfigMixin, SessionMixin
 
 class Policy(ConfigMixin, SessionMixin):
-    def __init__(self, config_file):
+    def __init__(self, config):
         self.values = {}
-        self.readConfig(config_file)
+        self.readConfig(config)
         self.createSession(self.getConfigItem('database', 'dburi'))
 
     def process(self):

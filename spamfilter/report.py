@@ -90,8 +90,8 @@ SUFFIX = '''</table>
 '''
 
 class ReportGenerator(ConfigMixin, SessionMixin):
-    def __init__(self, config_file):
-        self.readConfig(config_file)
+    def __init__(self, config):
+        self.readConfig(config)
         self.createSession(self.getConfigItem('database', 'dburi'))
         
     def report(self):

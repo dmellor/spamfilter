@@ -11,9 +11,9 @@ REJECTED = \
     'defer_if_permit System temporarily unavailable, please try again later'
 
 class GreylistPolicy(Policy):
-    def __init__(self, *args, **kws):
+    def __init__(self, **kws):
         global Greylist
-        super(GreylistPolicy, self).__init__(*args, **kws)
+        super(GreylistPolicy, self).__init__(**kws)
         Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
 
     def processRequest(self):
