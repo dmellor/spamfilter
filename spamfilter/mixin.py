@@ -14,20 +14,20 @@ class ConfigMixin(object):
                 raise
 
 
-class SessionMixin(object):
-    Session = None
-    
-    def createSession(self, dburi):
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        if not self.Session:
-            self.Session = sessionmaker(autoflush=False, transactional=True)
+Session = None
 
-        engine = create_engine(dburi, convert_unicode=False, echo=False)
-        self.session = self.Session(bind=engine.connect())
-        self.session.connection().execute(
-            'set transaction isolation level serializable')
+def createSession(dburi):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    global Session
+    if not Session:
+        Session = sessionmaker(autoflush=False, transactional=True)
 
+    engine = create_engine(dburi, convert_unicode=False, echo=False)
+    session = Session(bind=engine.connect())
+    session.connection().execute(
+        'set transaction isolation level serializable')
+    return session
 
 def queryPostfixDB(db, item):
     if item:

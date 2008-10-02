@@ -1,13 +1,13 @@
 import re
 import sys
 import time
-from spamfilter.mixin import ConfigMixin, SessionMixin
+from spamfilter.mixin import ConfigMixin, createSession
 
-class Policy(ConfigMixin, SessionMixin):
+class Policy(ConfigMixin):
     def __init__(self, config):
         self.values = {}
         self.readConfig(config)
-        self.createSession(self.getConfigItem('database', 'dburi'))
+        self.session = createSession(self.getConfigItem('database', 'dburi'))
 
     def process(self):
         name_value = re.compile('^([^=]*)=(.*)')
@@ -21,23 +21,7 @@ class Policy(ConfigMixin, SessionMixin):
                 name, value = match.groups()
                 self.values[name] = value
             else:
-                retries = 0
-                num_retries = int(self.getConfigItem('general', 'retries', 2))
-                while retries < num_retries:
-                    action = None
-                    err_status = None
-                    try:
-                        action = self.processRequest()
-                        self.session.commit()
-                        break
-                    except Exception, exc:
-                        self.session.rollback()
-                        self.session.clear()
-                        err_status = str(exc)
-                        retries += 1
-                        time.sleep(
-                            int(self.getConfigItem('general', 'wait', 5)))
-
+                action, err_status = self.processRequest()
                 if err_status:
                     err_status = re.sub('\n', '_', err_status)
                     sys.stdout.write('action=451 %s\n\n' % err_status)
@@ -48,4 +32,27 @@ class Policy(ConfigMixin, SessionMixin):
                 self.values = {}
 
     def processRequest(self):
+        return self.transaction(self.session)
+
+    def transaction(self, session):
+        retries = 0
+        num_retries = int(self.getConfigItem('general', 'retries', 2))
+        while retries < num_retries:
+            action = None
+            err_status = None
+            try:
+                action = self.processRequestInSession(session)
+                session.commit()
+                break
+            except Exception, exc:
+                session.rollback()
+                session.clear()
+                err_status = str(exc)
+                retries += 1
+                time.sleep(
+                    int(self.getConfigItem('general', 'wait', 5)))
+
+        return action, err_status
+
+    def processRequestInSession(self, session):
         raise Exception('Implementation not found')

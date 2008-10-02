@@ -16,7 +16,7 @@ class GreylistPolicy(Policy):
         super(GreylistPolicy, self).__init__(**kws)
         Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
 
-    def processRequest(self):
+    def processRequestInSession(self, session):
         ip_address = self.values.get('client_address')
         ip_address = '.'.join(ip_address.split('.')[:3])
         rcpt_to = self.values.get('recipient').lower()
@@ -25,7 +25,7 @@ class GreylistPolicy(Policy):
             mail_from = mail_from.lower()
         
         # Check if the tuple has been seen before.
-        query = self.session.query(Greylist)
+        query = session.query(Greylist)
         query = query.filter_by(ip_address=ip_address, mail_from=mail_from,
                                 rcpt_to=rcpt_to)
         record = query.first()
@@ -44,7 +44,7 @@ class GreylistPolicy(Policy):
                         greylist_table.c.ip_address == bindparam('ip_address'),
                         greylist_table.c.rcpt_to == bindparam('rcpt_to'),
                         greylist_table.c.mail_from.like(bindparam('domain'))))
-                    result = self.session.connection().execute(
+                    result = session.connection().execute(
                         query, ip_address=ip_address, rcpt_to=rcpt_to,
                         domain='%' + match.group(1)).fetchone()
                     if result[0]:
@@ -63,7 +63,7 @@ class GreylistPolicy(Policy):
             record.mail_from = mail_from
             record.rcpt_to = rcpt_to
             record.successful = 1
-            self.session.save(record)
+            session.save(record)
             return ACCEPTED
         else:
             record = Greylist()
@@ -71,5 +71,5 @@ class GreylistPolicy(Policy):
             record.mail_from = mail_from
             record.rcpt_to = rcpt_to
             record.unsuccessful = 1
-            self.session.save(record)
+            session.save(record)
             return REJECTED

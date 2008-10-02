@@ -8,7 +8,7 @@ import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 from sqlalchemy import select, text
 
-from spamfilter.mixin import ConfigMixin, SessionMixin
+from spamfilter.mixin import ConfigMixin, createSession
 from spamfilter.model.spam import Spam, SpamRecipient, spam_recipients_table
 
 HEADERS = '''From: <do_not_reply@${domain}>
@@ -89,10 +89,10 @@ SUFFIX = '''</table>
 </html>
 '''
 
-class ReportGenerator(ConfigMixin, SessionMixin):
+class ReportGenerator(ConfigMixin):
     def __init__(self, config):
         self.readConfig(config)
-        self.createSession(self.getConfigItem('database', 'dburi'))
+        self.session = createSession(self.getConfigItem('database', 'dburi'))
         
     def report(self):
         # Retrieve the addresses to which a quarantine message should be sent.

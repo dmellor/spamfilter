@@ -14,7 +14,7 @@ VIRUS = '250 Message contains a virus and has been quarantined'
 
 Greylist = None
 
-class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
+class SpamCheck(SmtpProxy, ConfigMixin):
     """
     This class checks a message against spamd for spam and clamd for viruses.
     """
@@ -22,7 +22,7 @@ class SpamCheck(SmtpProxy, ConfigMixin, SessionMixin):
         global Greylist
         super(SpamCheck, self).__init__(**kws)
         self.readConfig(config)
-        self.createSession(self.getConfigItem('database', 'dburi'))
+        self.session = createSession(self.getConfigItem('database', 'dburi'))
         Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
 
     def checkMessage(self, message):
