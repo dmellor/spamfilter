@@ -1,10 +1,8 @@
 import sys
 import re
 from sqlalchemy import *
-from spamfilter.model.greylist import *
+import spamfilter.model.greylist as greylist
 from spamfilter.policy import Policy
-
-Greylist = None
 
 ACCEPTED = 'dunno'
 REJECTED = \
@@ -12,9 +10,9 @@ REJECTED = \
 
 class GreylistPolicy(Policy):
     def __init__(self, **kws):
-        global Greylist
         super(GreylistPolicy, self).__init__(**kws)
-        Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
+        self.Greylist = greylist.createGreylistClass(
+            self.getConfigItem('greylist', 'interval', 30))
 
     def processRequestInSession(self, session):
         ip_address = self.values.get('client_address')
@@ -25,7 +23,7 @@ class GreylistPolicy(Policy):
             mail_from = mail_from.lower()
         
         # Check if the tuple has been seen before.
-        query = session.query(Greylist)
+        query = session.query(self.Greylist)
         query = query.filter_by(ip_address=ip_address, mail_from=mail_from,
                                 rcpt_to=rcpt_to)
         record = query.first()
@@ -39,11 +37,12 @@ class GreylistPolicy(Policy):
             if threshold and mail_from:
                 match = re.compile('(@.*)$').search(mail_from)
                 if match:
-                    query = select([func.sum(greylist_table.c.successful)])
+                    table = greylist.greylist_table
+                    query = select([func.sum(table.c.successful)])
                     query = query.where(and_(
-                        greylist_table.c.ip_address == bindparam('ip_address'),
-                        greylist_table.c.rcpt_to == bindparam('rcpt_to'),
-                        greylist_table.c.mail_from.like(bindparam('domain'))))
+                        table.c.ip_address == bindparam('ip_address'),
+                        table.c.rcpt_to == bindparam('rcpt_to'),
+                        table.c.mail_from.like(bindparam('domain'))))
                     result = session.connection().execute(
                         query, ip_address=ip_address, rcpt_to=rcpt_to,
                         domain='%' + match.group(1)).fetchone()
@@ -58,7 +57,7 @@ class GreylistPolicy(Policy):
             record.unsuccessful += 1
             return REJECTED
         elif auto_accept:
-            record = Greylist()
+            record = self.Greylist()
             record.ip_address = ip_address
             record.mail_from = mail_from
             record.rcpt_to = rcpt_to
@@ -66,7 +65,7 @@ class GreylistPolicy(Policy):
             session.save(record)
             return ACCEPTED
         else:
-            record = Greylist()
+            record = self.Greylist()
             record.ip_address = ip_address
             record.mail_from = mail_from
             record.rcpt_to = rcpt_to

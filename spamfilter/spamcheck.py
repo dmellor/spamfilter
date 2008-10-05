@@ -7,7 +7,7 @@ from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.virus import Virus, VirusRecipient
-from spamfilter.model.greylist import *
+from spamfilter.model.greylist import createGreylistClass
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 VIRUS = '250 Message contains a virus and has been quarantined'
@@ -23,7 +23,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         super(SpamCheck, self).__init__(**kws)
         self.readConfig(config)
         self.session = createSession(self.getConfigItem('database', 'dburi'))
-        Greylist = greylist(self.getConfigItem('greylist', 'interval', 30))
+        Greylist = createGreylistClass(
+            self.getConfigItem('greylist', 'interval', 30))
 
     def checkMessage(self, message):
         # If the remote address is in the POP before SMTP table, then we do not

@@ -17,7 +17,7 @@ greylist_table = Table(
     UniqueConstraint('ip_address', 'mail_from', 'rcpt_to',
                      name='greylist_tuple'))
 
-def greylist(interval=None):
+def createGreylistClass(interval=None):
 
     class Greylist(object):
         pass
@@ -36,4 +36,4 @@ def greylist(interval=None):
 
     return Greylist
 
-__all__ = ['greylist', 'greylist_table']
+__all__ = ['createGreylistClass', 'greylist_table']
