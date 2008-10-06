@@ -1,9 +1,12 @@
 from spamfilter.policy import Policy
 from spamfilter.model.spam import Spam
+from spamfilter.model.greylist import createGreylistClass
+from spamfilter.greylist import isGreylisted
 from spamfilter.mixin import createSession
 
 ACCEPTED = 'dunno'
-REJECTED = 'reject Spam has recently been received from %s'
+SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
+HARD_REJECTED = 'reject Spam has recently been received from %s'
 
 class BlacklistPolicy(Policy):
     def __init__(self, dbkeys, **kws):
@@ -19,6 +22,12 @@ class BlacklistPolicy(Policy):
                 pass
 
         self.extra_sessions = sessions
+        self.greylist_class = createGreylistClass(
+            self.getConfigItem('blacklist', 'interval', 720))
+        self.soft_threshold = int(self.getConfigItem('blacklist',
+                                                     'soft_threshold', 1))
+        self.hard_threshold = int(self.getConfigItem('blacklist',
+                                                     'hard_treshold', 3))
 
     def processRequest(self):
         action, err_status = self.transaction(self.session)
@@ -34,10 +43,17 @@ class BlacklistPolicy(Policy):
 
     def processRequestInSession(self, session):
         ip_address = self.values.get('client_address')
-        threshold = int(self.getConfigItem('blacklist', 'threshold', 1))
         query = session.query(Spam)
         num = query.filter_by(ip_address=ip_address).count()
-        if num >= threshold:
-            return REJECTED % ip_address
+        if num >= self.hard_threshold:
+            return HARD_REJECTED % ip_address
+        elif num >= self.soft_threshold:
+            rcpt_to = self.values.get('recipient')
+            mail_from = self.values.get('sender') or None
+            if isGreylisted(session, ip_address, rcpt_to, mail_from,
+                            self.greylist_class):
+                return SOFT_REJECTED % ip_address
+            else:
+                return ACCEPTED
         else:
             return ACCEPTED
