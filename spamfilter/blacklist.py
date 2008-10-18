@@ -56,4 +56,15 @@ class BlacklistPolicy(Policy):
             else:
                 return ACCEPTED
         else:
-            return ACCEPTED
+            helo = self.values.get('helo_name')
+            num = query.filter_by(helo=helo).count()
+            if num >= self.soft_threshold:
+                rcpt_to = self.values.get('recipient')
+                mail_from = self.values.get('sender') or None
+                if isGreylisted(session, ip_address, rcpt_to, mail_from,
+                                self.greylist_class):
+                    return SOFT_REJECTED % helo
+                else:
+                    return ACCEPTED
+            else:
+                return ACCEPTED
