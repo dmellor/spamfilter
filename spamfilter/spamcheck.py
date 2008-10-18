@@ -99,7 +99,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # The message is spam. In case of false positives, the message is
             # quarantined.
             spam = Spam(mail_from=self.mail_from, ip_address=self.remote_addr,
-                        contents=message, score=score, tests=tests)
+                        helo=self.remote_host, contents=message, score=score,
+                        tests=tests)
             recipients = self.getUniqueRecipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.save(spam)
@@ -116,7 +117,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         virus_type = checkClamav(message, host, port)
         if virus_type:
             # The message is a virus and must be quarantined.
-            virus = Virus(mail_from=self.mail_from,
+            virus = Virus(mail_from=self.mail_from, helo=self.remote_host,
                           ip_address=self.remote_addr, contents=message,
                           virus=virus_type)
             recipients = self.getUniqueRecipients()

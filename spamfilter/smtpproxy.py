@@ -18,7 +18,7 @@ class SmtpProxy(netcmd.NetCommand):
     reports to the SMTP client that the mail has been accepted - this behaviour
     is required in order to implement an after-queue content filter for
     Postfix. A subclass of this class would override the check_message method
-    to qurantine the message if it is identified as spam or if it contains a
+    to quarantine the message if it is identified as spam or if it contains a
     virus.
     """
     def __init__(self, input=sys.stdin, output=sys.stdout, host='localhost',
@@ -28,6 +28,7 @@ class SmtpProxy(netcmd.NetCommand):
         self.rcpt_to = []
         self.mail_from = None
         self.remote_addr = None
+        self.remote_host = None
         self.error_response = None
         self.input = input
         self.output = output
@@ -70,6 +71,7 @@ class SmtpProxy(netcmd.NetCommand):
                 self.rcpt_to = []
                 self.mail_from = None
                 self.remote_addr = None
+                self.remote_host = None
                 self.error_response = None
             else:
                 self.sendCommandAndResponse(command)
@@ -119,12 +121,16 @@ class SmtpProxy(netcmd.NetCommand):
         self.output.flush()
     
     def xforward(self, command):
-        # Extract the remote IP address and save if for logging purposes.
-        regexp = re.compile('^ADDR=(.*)')
+        # Extract the remote IP address and hostname and save them for logging
+        # purposes.
+        regexp = re.compile('^(ADDR|HELO)=(.*)')
         for token in command:
             match = regexp.search(token)
             if match:
-                self.remote_addr = match.group(1)
+                if match.group(1) == 'ADDR':
+                    self.remote_addr = match.group(2)
+                else:
+                    self.remote_host = match.group(2).lower()
     
     def data(self, command):
         self.command(command)

@@ -12,6 +12,7 @@ spam_table = Table(
     Column('id', Integer, Sequence('spam_id_seq'), primary_key=True),
     Column('mail_from', String(1024), nullable=True),
     Column('ip_address', String(15), nullable=False),
+    Column('helo', String(1024), nullable=True),
     Column('contents', TEXT, nullable=False),
     Column('score', Float(precision='double'), nullable=False),
     Column('tests', TEXT, nullable=False),
