@@ -12,7 +12,7 @@ viruses_table = Table(
     Column('id', Integer, Sequence('viruses_id_seq'), primary_key=True),
     Column('mail_from', String(1024), nullable=True),
     Column('ip_address', String(15), nullable=False),
-    Column('helo', String(1024), nullable=True),
+    Column('helo', String(1024), nullable=False),
     Column('contents', TEXT, nullable=False),
     Column('virus', TEXT, nullable=False),
     Column('created', TIMESTAMP, PassiveDefault(text('now()')),
