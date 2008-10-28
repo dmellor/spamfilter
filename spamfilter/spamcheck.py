@@ -38,13 +38,18 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # consistently and incorrectly flags as spam.
         whitelist_db = self.getConfigItem('spamfilter', 'whitelist_db', None)
         if whitelist_db and self.mail_from:
-            # First check the full address, and then check the domain.
+            # First check the full address.
             if queryPostfixDB(whitelist_db, self.mail_from):
                 return True
-            else:
-                domain = self.mail_from.index('@') + 1
-                if queryPostfixDB(whitelist_db, self.mail_from[domain:]):
-                    return True
+
+            # Check the domain.
+            domain = self.mail_from.index('@') + 1
+            if queryPostfixDB(whitelist_db, self.mail_from[domain:]):
+                return True
+
+            # Check if the HELO string is whitelisted.
+            if queryPostfixDB(whitelist_db, self.remote_host):
+                return True
 
         # The client is an external client - perform the spam and virus checks.
         retries = 0
