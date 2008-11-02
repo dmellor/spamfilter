@@ -39,40 +39,13 @@ def isGreylisted(session, ip_address, rcpt_to, mail_from, greylist_class,
                             rcpt_to=rcpt_to)
     record = query.first()
 
-    # If the number of successful connections from a domain has been
-    # achieved, then we automatically accept the connection.
-    auto_accept = False
-    if not record or not record.accepted:
-        if threshold and mail_from:
-            match = re.compile('(@.*)$').search(mail_from)
-            if match:
-                table = greylist.greylist_table
-                query = select([func.sum(table.c.successful)])
-                query = query.where(and_(
-                    table.c.ip_address == bindparam('ip_address'),
-                    table.c.rcpt_to == bindparam('rcpt_to'),
-                    table.c.mail_from.like(bindparam('domain'))))
-                result = session.connection().execute(
-                    query, ip_address=ip_address, rcpt_to=rcpt_to,
-                    domain='%' + match.group(1)).fetchone()
-                if result[0]:
-                    auto_accept = result[0] >= threshold
-
     # Detemine the status and update the greylist record.
-    if record and (record.accepted or auto_accept):
+    if record and record.accepted:
         record.successful += 1
         return False
     elif record:
         record.unsuccessful += 1
         return True
-    elif auto_accept:
-        record = greylist_class()
-        record.ip_address = ip_address
-        record.mail_from = mail_from
-        record.rcpt_to = rcpt_to
-        record.successful = 1
-        session.save(record)
-        return False
     else:
         record = greylist_class()
         record.ip_address = ip_address
