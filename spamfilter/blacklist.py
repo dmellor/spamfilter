@@ -1,6 +1,7 @@
 from spamfilter.policy import Policy
 from spamfilter.model.spam import Spam
 from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.blacklist import Blacklist
 from spamfilter.greylist import isGreylisted
 from spamfilter.mixin import createSession
 
@@ -46,12 +47,14 @@ class BlacklistPolicy(Policy):
         query = session.query(Spam)
         num = query.filter_by(ip_address=ip_address).count()
         if num >= self.hard_threshold:
+            session.save(Blacklist(ip_address=ip_address))
             return HARD_REJECTED % ip_address
         elif num >= self.soft_threshold:
             rcpt_to = self.values.get('recipient')
             mail_from = self.values.get('sender') or None
             if isGreylisted(session, ip_address, rcpt_to, mail_from,
                             self.greylist_class):
+                session.save(Blacklist(ip_address=ip_address))
                 return SOFT_REJECTED % ip_address
             else:
                 return ACCEPTED
@@ -63,6 +66,7 @@ class BlacklistPolicy(Policy):
                 mail_from = self.values.get('sender') or None
                 if isGreylisted(session, ip_address, rcpt_to, mail_from,
                                 self.greylist_class):
+                    session.save(Blacklist(ip_address=ip_address))
                     return SOFT_REJECTED % helo
                 else:
                     return ACCEPTED

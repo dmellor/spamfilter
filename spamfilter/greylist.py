@@ -2,9 +2,11 @@ import sys
 import re
 from sqlalchemy import *
 import spamfilter.model.greylist as greylist
+from spamfilter.model.blacklist import Blacklist
 from spamfilter.policy import Policy
 
 ACCEPTED = 'dunno'
+BLACKLISTED = 'defer_if_permit %s is currently blacklisted'
 REJECTED = \
     'defer_if_permit System temporarily unavailable, please try again later'
 
@@ -15,7 +17,17 @@ class GreylistPolicy(Policy):
             self.getConfigItem('greylist', 'interval', 30))
 
     def processRequestInSession(self, session):
+        # First check if the current IP address is blacklisted. If it is, then
+        # the blacklist policy will have already rejected this message and
+        # there is nothing further that needs to be done here. This is
+        # necessary because Postfix still evalutes the recipient restrictions
+        # even if the sender restrictions have already rejected the message.
         ip_address = self.values.get('client_address')
+        query = session.query(Blacklist).filter_by(ip_address=ip_address)
+        if query.count():
+            return BLACKLISTED % ip_address
+
+        # Check if the current message should be greylisted.
         rcpt_to = self.values.get('recipient')
         mail_from = self.values.get('sender') or None
         threshold = int(self.getConfigItem('greylist', 'auto_threshold', 3))
