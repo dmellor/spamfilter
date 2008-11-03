@@ -4,61 +4,88 @@
 
 SET client_encoding = 'SQL_ASCII';
 SET check_function_bodies = false;
+SET client_min_messages = warning;
 
-SET SESSION AUTHORIZATION 'root';
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
+--
+
+COMMENT ON SCHEMA public IS 'Standard public schema';
+
+
+--
+-- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: -; Owner: 
+--
+
+CREATE PROCEDURAL LANGUAGE plpgsql;
+
 
 SET search_path = public, pg_catalog;
 
 --
--- TOC entry 52 (OID 186070)
--- Name: plpgsql_call_handler(); Type: FUNC PROCEDURAL LANGUAGE; Schema: public; Owner: root
+-- Name: convert_blacklist(); Type: FUNCTION; Schema: public; Owner: david
 --
 
-CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler
-    AS '$libdir/plpgsql', 'plpgsql_call_handler'
-    LANGUAGE c;
-
-
-SET SESSION AUTHORIZATION DEFAULT;
-
---
--- TOC entry 51 (OID 186071)
--- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: public; Owner: 
---
-
-CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler;
-
-
-SET SESSION AUTHORIZATION 'postgres';
-
---
--- TOC entry 4 (OID 2200)
--- Name: public; Type: ACL; Schema: -; Owner: postgres
---
-
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT ALL ON SCHEMA public TO PUBLIC;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 53 (OID 186072)
--- Name: stamp(); Type: FUNCTION; Schema: public; Owner: david
---
-
-CREATE FUNCTION stamp() RETURNS "trigger"
+CREATE FUNCTION convert_blacklist() RETURNS "trigger"
     AS '
-BEGIN
-	NEW.modified := ''now'';
-	RETURN NEW;
-END;
-'
+begin
+	if TG_OP = ''INSERT'' then
+		NEW.regexp = generateRegexp(NEW.mail_from);
+	elsif TG_OP = ''UPDATE'' and
+		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
+		NEW.regexp = generateRegexp(NEW.mail_from);
+	end if;
+
+	return NEW;
+end;'
     LANGUAGE plpgsql;
 
 
+ALTER FUNCTION public.convert_blacklist() OWNER TO david;
+
 --
--- TOC entry 54 (OID 186073)
+-- Name: convert_original(); Type: FUNCTION; Schema: public; Owner: david
+--
+
+CREATE FUNCTION convert_original() RETURNS "trigger"
+    AS '
+begin
+	if TG_OP = ''INSERT'' then
+		NEW.regexp = generateRegexp(NEW.original);
+	elsif TG_OP = ''UPDATE'' and
+		(NEW.original != OLD.original or NEW.regexp != OLD.regexp) then
+		NEW.regexp = generateRegexp(NEW.original);
+	end if;
+
+	return NEW;
+end;'
+    LANGUAGE plpgsql;
+
+
+ALTER FUNCTION public.convert_original() OWNER TO david;
+
+--
+-- Name: convert_whitelist_from(); Type: FUNCTION; Schema: public; Owner: david
+--
+
+CREATE FUNCTION convert_whitelist_from() RETURNS "trigger"
+    AS '
+begin
+	if TG_OP = ''INSERT'' then
+		NEW.regexp = generateRegexp(NEW.mail_from);
+	elsif TG_OP = ''UPDATE'' and
+		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
+		NEW.regexp = generateRegexp(NEW.mail_from);
+	end if;
+
+	return NEW;
+end;'
+    LANGUAGE plpgsql;
+
+
+ALTER FUNCTION public.convert_whitelist_from() OWNER TO david;
+
+--
 -- Name: extract_header(text, text); Type: FUNCTION; Schema: public; Owner: david
 --
 
@@ -87,13 +114,14 @@ END;'
     LANGUAGE plpgsql IMMUTABLE STRICT;
 
 
+ALTER FUNCTION public.extract_header(text, text) OWNER TO david;
+
 --
--- TOC entry 55 (OID 186074)
 -- Name: generateregexp(text); Type: FUNCTION; Schema: public; Owner: david
 --
 
 CREATE FUNCTION generateregexp(text) RETURNS text
-    AS '
+    AS E'
 declare
 	orig alias for $1;
 	regexp text;
@@ -121,345 +149,45 @@ end;'
     LANGUAGE plpgsql IMMUTABLE STRICT;
 
 
+ALTER FUNCTION public.generateregexp(text) OWNER TO david;
+
 --
--- TOC entry 56 (OID 186075)
--- Name: convert_whitelist_from(); Type: FUNCTION; Schema: public; Owner: david
+-- Name: plpgsql_call_handler(); Type: FUNCTION; Schema: public; Owner: root
 --
 
-CREATE FUNCTION convert_whitelist_from() RETURNS "trigger"
+CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler
+    AS '$libdir/plpgsql', 'plpgsql_call_handler'
+    LANGUAGE c;
+
+
+ALTER FUNCTION public.plpgsql_call_handler() OWNER TO root;
+
+--
+-- Name: stamp(); Type: FUNCTION; Schema: public; Owner: david
+--
+
+CREATE FUNCTION stamp() RETURNS "trigger"
     AS '
-begin
-	if TG_OP = ''INSERT'' then
-		NEW.regexp = generateRegexp(NEW.mail_from);
-	elsif TG_OP = ''UPDATE'' and
-		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
-		NEW.regexp = generateRegexp(NEW.mail_from);
-	end if;
-
-	return NEW;
-end;'
+BEGIN
+	NEW.modified := ''now'';
+	RETURN NEW;
+END;
+'
     LANGUAGE plpgsql;
 
 
---
--- TOC entry 5 (OID 186076)
--- Name: whitelist_from_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
+ALTER FUNCTION public.stamp() OWNER TO david;
 
-CREATE SEQUENCE whitelist_from_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
+SET default_tablespace = '';
 
+SET default_with_oids = false;
 
 --
--- TOC entry 57 (OID 186078)
--- Name: convert_original(); Type: FUNCTION; Schema: public; Owner: david
---
-
-CREATE FUNCTION convert_original() RETURNS "trigger"
-    AS '
-begin
-	if TG_OP = ''INSERT'' then
-		NEW.regexp = generateRegexp(NEW.original);
-	elsif TG_OP = ''UPDATE'' and
-		(NEW.original != OLD.original or NEW.regexp != OLD.regexp) then
-		NEW.regexp = generateRegexp(NEW.original);
-	end if;
-
-	return NEW;
-end;'
-    LANGUAGE plpgsql;
-
-
---
--- TOC entry 20 (OID 186079)
--- Name: domain_names; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE domain_names (
-    "domain" character varying(255) NOT NULL,
-    display character varying(255) NOT NULL
-);
-
-
---
--- TOC entry 21 (OID 186079)
--- Name: domain_names; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE domain_names FROM PUBLIC;
-GRANT SELECT ON TABLE domain_names TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 6 (OID 186081)
--- Name: quarantine_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE quarantine_recipients_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 22 (OID 186083)
--- Name: quarantine_recipients; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE quarantine_recipients (
-    id integer DEFAULT nextval('quarantine_recipients_id_seq'::text) NOT NULL,
-    original character varying(255) NOT NULL,
-    delivery character varying(255) NOT NULL,
-    regexp character varying(255) NOT NULL
-);
-
-
---
--- TOC entry 23 (OID 186083)
--- Name: quarantine_recipients; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE quarantine_recipients FROM PUBLIC;
-GRANT SELECT ON TABLE quarantine_recipients TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 7 (OID 186086)
--- Name: blacklist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE blacklist_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 58 (OID 186088)
--- Name: convert_blacklist(); Type: FUNCTION; Schema: public; Owner: david
---
-
-CREATE FUNCTION convert_blacklist() RETURNS "trigger"
-    AS '
-begin
-	if TG_OP = ''INSERT'' then
-		NEW.regexp = generateRegexp(NEW.mail_from);
-	elsif TG_OP = ''UPDATE'' and
-		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
-		NEW.regexp = generateRegexp(NEW.mail_from);
-	end if;
-
-	return NEW;
-end;'
-    LANGUAGE plpgsql;
-
-
---
--- TOC entry 24 (OID 186089)
--- Name: greylist; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE greylist (
-    id integer DEFAULT nextval('greylist_id_seq'::text) NOT NULL,
-    ip_address character varying(11) NOT NULL,
-    mail_from character varying(1024),
-    rcpt_to character varying(1024) NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL,
-    modified timestamp with time zone NOT NULL,
-    successful integer DEFAULT 0 NOT NULL,
-    unsuccessful integer DEFAULT 0 NOT NULL
-);
-
-
---
--- TOC entry 25 (OID 186089)
--- Name: greylist; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE greylist FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 8 (OID 186098)
--- Name: greylist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE greylist_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 9 (OID 186098)
--- Name: greylist_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE greylist_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 26 (OID 186100)
--- Name: spam_recipients; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE spam_recipients (
-    id integer DEFAULT nextval('spam_recipients_id_seq'::text) NOT NULL,
-    recipient character varying(1024) NOT NULL,
-    spam_id integer NOT NULL,
-    delivery_id character varying(32)
-);
-
-
---
--- TOC entry 27 (OID 186100)
--- Name: spam_recipients; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE spam_recipients FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 10 (OID 186103)
--- Name: spam_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE spam_recipients_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 11 (OID 186103)
--- Name: spam_recipients_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE spam_recipients_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 12 (OID 186112)
--- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE spam_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 13 (OID 186112)
--- Name: spam_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE spam_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 28 (OID 186114)
--- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE virus_recipients (
-    id integer DEFAULT nextval('virus_recipients_id_seq'::text) NOT NULL,
-    recipient character varying(1024) NOT NULL,
-    virus_id integer NOT NULL
-);
-
-
---
--- TOC entry 29 (OID 186114)
--- Name: virus_recipients; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE virus_recipients FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 14 (OID 186117)
--- Name: virus_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE virus_recipients_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 15 (OID 186117)
--- Name: virus_recipients_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE virus_recipients_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 16 (OID 186126)
--- Name: viruses_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE viruses_id_seq
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
--- TOC entry 17 (OID 186126)
--- Name: viruses_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE viruses_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
-
---
--- TOC entry 30 (OID 186128)
--- Name: auto_whitelist; Type: TABLE; Schema: public; Owner: david
+-- Name: auto_whitelist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE TABLE auto_whitelist (
-    id integer DEFAULT nextval('auto_whitelist_id_seq'::text) NOT NULL,
+    id integer DEFAULT nextval(('auto_whitelist_id_seq'::text)::regclass) NOT NULL,
     username character varying(1024) NOT NULL,
     email character varying(1024) NOT NULL,
     ip character varying(15) NOT NULL,
@@ -470,19 +198,9 @@ CREATE TABLE auto_whitelist (
 );
 
 
---
--- TOC entry 31 (OID 186128)
--- Name: auto_whitelist; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE auto_whitelist FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
+ALTER TABLE public.auto_whitelist OWNER TO david;
 
 --
--- TOC entry 18 (OID 186135)
 -- Name: auto_whitelist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -493,24 +211,97 @@ CREATE SEQUENCE auto_whitelist_id_seq
     CACHE 1;
 
 
---
--- TOC entry 19 (OID 186135)
--- Name: auto_whitelist_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE auto_whitelist_id_seq FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
+ALTER TABLE public.auto_whitelist_id_seq OWNER TO david;
 
 --
--- TOC entry 32 (OID 218846)
--- Name: spam; Type: TABLE; Schema: public; Owner: david
+-- Name: blacklist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE blacklist (
+    id serial NOT NULL,
+    ip_address character varying(15) NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.blacklist OWNER TO david;
+
+--
+-- Name: domain_names; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE domain_names (
+    "domain" character varying(255) NOT NULL,
+    display character varying(255) NOT NULL
+);
+
+
+ALTER TABLE public.domain_names OWNER TO david;
+
+--
+-- Name: greylist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE greylist (
+    id integer DEFAULT nextval(('greylist_id_seq'::text)::regclass) NOT NULL,
+    ip_address character varying(11) NOT NULL,
+    mail_from character varying(1024),
+    rcpt_to character varying(1024) NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    modified timestamp with time zone NOT NULL,
+    successful integer DEFAULT 0 NOT NULL,
+    unsuccessful integer DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE public.greylist OWNER TO david;
+
+--
+-- Name: greylist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE greylist_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.greylist_id_seq OWNER TO david;
+
+--
+-- Name: quarantine_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE quarantine_recipients (
+    id integer DEFAULT nextval(('quarantine_recipients_id_seq'::text)::regclass) NOT NULL,
+    original character varying(255) NOT NULL,
+    delivery character varying(255) NOT NULL,
+    regexp character varying(255) NOT NULL
+);
+
+
+ALTER TABLE public.quarantine_recipients OWNER TO david;
+
+--
+-- Name: quarantine_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE quarantine_recipients_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.quarantine_recipients_id_seq OWNER TO david;
+
+--
+-- Name: spam; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE TABLE spam (
-    id integer DEFAULT nextval('spam_id_seq'::text) NOT NULL,
+    id integer DEFAULT nextval(('spam_id_seq'::text)::regclass) NOT NULL,
     mail_from character varying(1024),
     ip_address character varying(15) NOT NULL,
     helo character varying(1024) NOT NULL,
@@ -521,24 +312,80 @@ CREATE TABLE spam (
 );
 
 
---
--- TOC entry 33 (OID 218846)
--- Name: spam; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE spam FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
+ALTER TABLE public.spam OWNER TO david;
 
 --
--- TOC entry 34 (OID 218938)
--- Name: viruses; Type: TABLE; Schema: public; Owner: david
+-- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE spam_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.spam_id_seq OWNER TO david;
+
+--
+-- Name: spam_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE spam_recipients (
+    id integer DEFAULT nextval(('spam_recipients_id_seq'::text)::regclass) NOT NULL,
+    recipient character varying(1024) NOT NULL,
+    spam_id integer NOT NULL,
+    delivery_id character varying(32)
+);
+
+
+ALTER TABLE public.spam_recipients OWNER TO david;
+
+--
+-- Name: spam_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE spam_recipients_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.spam_recipients_id_seq OWNER TO david;
+
+--
+-- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE virus_recipients (
+    id integer DEFAULT nextval(('virus_recipients_id_seq'::text)::regclass) NOT NULL,
+    recipient character varying(1024) NOT NULL,
+    virus_id integer NOT NULL
+);
+
+
+ALTER TABLE public.virus_recipients OWNER TO david;
+
+--
+-- Name: virus_recipients_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE virus_recipients_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.virus_recipients_id_seq OWNER TO david;
+
+--
+-- Name: viruses; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE TABLE viruses (
-    id integer DEFAULT nextval('viruses_id_seq'::text) NOT NULL,
+    id integer DEFAULT nextval(('viruses_id_seq'::text)::regclass) NOT NULL,
     mail_from character varying(1024),
     ip_address character varying(15) NOT NULL,
     helo character varying(1024) NOT NULL,
@@ -548,122 +395,36 @@ CREATE TABLE viruses (
 );
 
 
---
--- TOC entry 35 (OID 218938)
--- Name: viruses; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE viruses FROM PUBLIC;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses TO qmail;
-
-
-SET SESSION AUTHORIZATION 'david';
+ALTER TABLE public.viruses OWNER TO david;
 
 --
--- TOC entry 42 (OID 213561)
--- Name: greylist_tuple; Type: INDEX; Schema: public; Owner: david
+-- Name: viruses_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
-CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (ip_address, mail_from, rcpt_to);
+CREATE SEQUENCE viruses_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
 
 
---
--- TOC entry 39 (OID 213562)
--- Name: greylist_ip_address; Type: INDEX; Schema: public; Owner: david
---
-
-CREATE INDEX greylist_ip_address ON greylist USING btree (ip_address);
-
+ALTER TABLE public.viruses_id_seq OWNER TO david;
 
 --
--- TOC entry 40 (OID 213563)
--- Name: greylist_mail_from; Type: INDEX; Schema: public; Owner: david
+-- Name: whitelist_from_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
-CREATE INDEX greylist_mail_from ON greylist USING btree (mail_from);
+CREATE SEQUENCE whitelist_from_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
 
 
---
--- TOC entry 45 (OID 213564)
--- Name: auto_whitelist_address_index; Type: INDEX; Schema: public; Owner: david
---
-
-CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (username, email, ip);
-
+ALTER TABLE public.whitelist_from_id_seq OWNER TO david;
 
 --
--- TOC entry 48 (OID 218936)
--- Name: spam_ip_address; Type: INDEX; Schema: public; Owner: david
---
-
-CREATE INDEX spam_ip_address ON spam USING btree (ip_address);
-
-
---
--- TOC entry 47 (OID 218937)
--- Name: spam_helo; Type: INDEX; Schema: public; Owner: david
---
-
-CREATE INDEX spam_helo ON spam USING btree (helo);
-
-
---
--- TOC entry 36 (OID 213565)
--- Name: domain_names_domain_key; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY domain_names
-    ADD CONSTRAINT domain_names_domain_key UNIQUE ("domain");
-
-
---
--- TOC entry 38 (OID 213567)
--- Name: quarantine_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY quarantine_recipients
-    ADD CONSTRAINT quarantine_recipients_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 37 (OID 213569)
--- Name: quarantine_recipients_original_index; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY quarantine_recipients
-    ADD CONSTRAINT quarantine_recipients_original_index UNIQUE (original);
-
-
---
--- TOC entry 41 (OID 213571)
--- Name: greylist_pkey; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY greylist
-    ADD CONSTRAINT greylist_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 43 (OID 213573)
--- Name: spam_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY spam_recipients
-    ADD CONSTRAINT spam_recipients_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 44 (OID 213577)
--- Name: virus_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY virus_recipients
-    ADD CONSTRAINT virus_recipients_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 46 (OID 213581)
--- Name: auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david
+-- Name: auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
 ALTER TABLE ONLY auto_whitelist
@@ -671,8 +432,47 @@ ALTER TABLE ONLY auto_whitelist
 
 
 --
--- TOC entry 49 (OID 218930)
--- Name: spam_pkey; Type: CONSTRAINT; Schema: public; Owner: david
+-- Name: blacklist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY blacklist
+    ADD CONSTRAINT blacklist_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: domain_names_domain_key; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY domain_names
+    ADD CONSTRAINT domain_names_domain_key UNIQUE ("domain");
+
+
+--
+-- Name: greylist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY greylist
+    ADD CONSTRAINT greylist_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: quarantine_recipients_original_index; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY quarantine_recipients
+    ADD CONSTRAINT quarantine_recipients_original_index UNIQUE (original);
+
+
+--
+-- Name: quarantine_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY quarantine_recipients
+    ADD CONSTRAINT quarantine_recipients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spam_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
 ALTER TABLE ONLY spam
@@ -680,8 +480,23 @@ ALTER TABLE ONLY spam
 
 
 --
--- TOC entry 50 (OID 218945)
--- Name: viruses_pkey; Type: CONSTRAINT; Schema: public; Owner: david
+-- Name: spam_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY spam_recipients
+    ADD CONSTRAINT spam_recipients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: virus_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY virus_recipients
+    ADD CONSTRAINT virus_recipients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: viruses_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
 ALTER TABLE ONLY viruses
@@ -689,36 +504,65 @@ ALTER TABLE ONLY viruses
 
 
 --
--- TOC entry 59 (OID 218932)
--- Name: spam_recipients_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
+-- Name: auto_whitelist_address_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-ALTER TABLE ONLY spam_recipients
-    ADD CONSTRAINT spam_recipients_fkey FOREIGN KEY (spam_id) REFERENCES spam(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (username, email, ip);
 
 
 --
--- TOC entry 60 (OID 218947)
--- Name: virus_recipients_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
+-- Name: blacklist_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-ALTER TABLE ONLY virus_recipients
-    ADD CONSTRAINT virus_recipients_fkey FOREIGN KEY (virus_id) REFERENCES viruses(id) ON DELETE CASCADE;
+CREATE INDEX blacklist_ip_address ON blacklist USING btree (ip_address);
 
 
 --
--- TOC entry 61 (OID 213591)
--- Name: quarantine_recipients_regexp; Type: TRIGGER; Schema: public; Owner: david
+-- Name: greylist_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-CREATE TRIGGER quarantine_recipients_regexp
-    BEFORE INSERT OR UPDATE ON quarantine_recipients
+CREATE INDEX greylist_ip_address ON greylist USING btree (ip_address);
+
+
+--
+-- Name: greylist_mail_from; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE INDEX greylist_mail_from ON greylist USING btree (mail_from);
+
+
+--
+-- Name: greylist_tuple; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (ip_address, mail_from, rcpt_to);
+
+
+--
+-- Name: spam_helo; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE INDEX spam_helo ON spam USING btree (helo);
+
+
+--
+-- Name: spam_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE INDEX spam_ip_address ON spam USING btree (ip_address);
+
+
+--
+-- Name: auto_whitelist_stamp; Type: TRIGGER; Schema: public; Owner: david
+--
+
+CREATE TRIGGER auto_whitelist_stamp
+    BEFORE INSERT OR UPDATE ON auto_whitelist
     FOR EACH ROW
-    EXECUTE PROCEDURE convert_original();
+    EXECUTE PROCEDURE stamp();
 
 
 --
--- TOC entry 62 (OID 213592)
 -- Name: greylist_stamp; Type: TRIGGER; Schema: public; Owner: david
 --
 
@@ -729,23 +573,202 @@ CREATE TRIGGER greylist_stamp
 
 
 --
--- TOC entry 63 (OID 213593)
--- Name: auto_whitelist_stamp; Type: TRIGGER; Schema: public; Owner: david
+-- Name: quarantine_recipients_regexp; Type: TRIGGER; Schema: public; Owner: david
 --
 
-CREATE TRIGGER auto_whitelist_stamp
-    BEFORE INSERT OR UPDATE ON auto_whitelist
+CREATE TRIGGER quarantine_recipients_regexp
+    BEFORE INSERT OR UPDATE ON quarantine_recipients
     FOR EACH ROW
-    EXECUTE PROCEDURE stamp();
+    EXECUTE PROCEDURE convert_original();
 
-
-SET SESSION AUTHORIZATION 'postgres';
 
 --
--- TOC entry 3 (OID 2200)
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
+-- Name: spam_recipients_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
 --
 
-COMMENT ON SCHEMA public IS 'Standard public schema';
+ALTER TABLE ONLY spam_recipients
+    ADD CONSTRAINT spam_recipients_fkey FOREIGN KEY (spam_id) REFERENCES spam(id) ON DELETE CASCADE;
 
+
+--
+-- Name: virus_recipients_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY virus_recipients
+    ADD CONSTRAINT virus_recipients_fkey FOREIGN KEY (virus_id) REFERENCES viruses(id) ON DELETE CASCADE;
+
+
+--
+-- Name: public; Type: ACL; Schema: -; Owner: postgres
+--
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM postgres;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+
+--
+-- Name: auto_whitelist; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE auto_whitelist FROM PUBLIC;
+REVOKE ALL ON TABLE auto_whitelist FROM david;
+GRANT ALL ON TABLE auto_whitelist TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist TO qmail;
+
+
+--
+-- Name: auto_whitelist_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE auto_whitelist_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE auto_whitelist_id_seq FROM david;
+GRANT ALL ON TABLE auto_whitelist_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
+
+
+--
+-- Name: blacklist; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE blacklist FROM PUBLIC;
+REVOKE ALL ON TABLE blacklist FROM david;
+GRANT ALL ON TABLE blacklist TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE blacklist TO qmail;
+
+
+--
+-- Name: blacklist_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE blacklist_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE blacklist_id_seq FROM david;
+GRANT ALL ON TABLE blacklist_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE blacklist_id_seq TO qmail;
+
+
+--
+-- Name: domain_names; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE domain_names FROM PUBLIC;
+REVOKE ALL ON TABLE domain_names FROM david;
+GRANT ALL ON TABLE domain_names TO david;
+GRANT SELECT ON TABLE domain_names TO qmail;
+
+
+--
+-- Name: greylist; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE greylist FROM PUBLIC;
+REVOKE ALL ON TABLE greylist FROM david;
+GRANT ALL ON TABLE greylist TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist TO qmail;
+
+
+--
+-- Name: greylist_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE greylist_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE greylist_id_seq FROM david;
+GRANT ALL ON TABLE greylist_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist_id_seq TO qmail;
+
+
+--
+-- Name: quarantine_recipients; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE quarantine_recipients FROM PUBLIC;
+REVOKE ALL ON TABLE quarantine_recipients FROM david;
+GRANT ALL ON TABLE quarantine_recipients TO david;
+GRANT SELECT ON TABLE quarantine_recipients TO qmail;
+
+
+--
+-- Name: spam; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam FROM PUBLIC;
+REVOKE ALL ON TABLE spam FROM david;
+GRANT ALL ON TABLE spam TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
+
+
+--
+-- Name: spam_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE spam_id_seq FROM david;
+GRANT ALL ON TABLE spam_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_id_seq TO qmail;
+
+
+--
+-- Name: spam_recipients; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam_recipients FROM PUBLIC;
+REVOKE ALL ON TABLE spam_recipients FROM david;
+GRANT ALL ON TABLE spam_recipients TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients TO qmail;
+
+
+--
+-- Name: spam_recipients_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam_recipients_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE spam_recipients_id_seq FROM david;
+GRANT ALL ON TABLE spam_recipients_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients_id_seq TO qmail;
+
+
+--
+-- Name: virus_recipients; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE virus_recipients FROM PUBLIC;
+REVOKE ALL ON TABLE virus_recipients FROM david;
+GRANT ALL ON TABLE virus_recipients TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients TO qmail;
+
+
+--
+-- Name: virus_recipients_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE virus_recipients_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE virus_recipients_id_seq FROM david;
+GRANT ALL ON TABLE virus_recipients_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients_id_seq TO qmail;
+
+
+--
+-- Name: viruses; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE viruses FROM PUBLIC;
+REVOKE ALL ON TABLE viruses FROM david;
+GRANT ALL ON TABLE viruses TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses TO qmail;
+
+
+--
+-- Name: viruses_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE viruses_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE viruses_id_seq FROM david;
+GRANT ALL ON TABLE viruses_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses_id_seq TO qmail;
+
+
+--
+-- PostgreSQL database dump complete
+--
 
