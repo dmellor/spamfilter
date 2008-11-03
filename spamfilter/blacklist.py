@@ -57,6 +57,7 @@ class BlacklistPolicy(Policy):
                 session.save(Blacklist(ip_address=ip_address))
                 return SOFT_REJECTED % ip_address
             else:
+                removeBlacklistEntries(session, ip_address)
                 return ACCEPTED
         else:
             helo = self.values.get('helo_name')
@@ -69,6 +70,13 @@ class BlacklistPolicy(Policy):
                     session.save(Blacklist(ip_address=ip_address))
                     return SOFT_REJECTED % helo
                 else:
+                    removeBlacklistEntries(session, ip_address)
                     return ACCEPTED
             else:
+                removeBlacklistEntries(session, ip_address)
                 return ACCEPTED
+
+def removeBlacklistEntries(session, ip_address):
+    query = session.query(Blacklist).filter_by(ip_address=ip_address)
+    for entry in query.all():
+        session.delete(entry)
