@@ -6,3 +6,5 @@ handler.setFormatter(logging.Formatter('%(message)s'))
 root = logging.getLogger()
 root.setLevel(logging.INFO)
 root.addHandler(handler)
+
+__all__ = []
