@@ -2,6 +2,7 @@ from subprocess import *
 import socket
 import re
 import time
+import logging
 
 from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
@@ -67,8 +68,11 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 self.session.rollback()
                 self.session.clear()
                 err_status = re.sub(r'\r?\n', ' ', str(exc))
+                logging.info('spamcheck failed: %s', err_status)
                 retries += 1
-                time.sleep(int(self.getConfigItem('general', 'wait', 5)))
+                wait_time = int(self.getConfigItem('general', 'wait', 5))
+                logging.info('sleeping for %s seconds', wait_time)
+                time.sleep(wait_time)
                            
         if err_status:
             self.error_response = "451 %s" % err_status
@@ -119,8 +123,9 @@ class SpamCheck(SmtpProxy, ConfigMixin):
     def checkVirus(self, message):
         # Check the message against the ClamAV server.
         host = self.getConfigItem('spamfilter', 'clamav_server', 'localhost')
-        port = int(self.getConfigItem('spamfilter', 'clamav_port', 3310))
-        virus_type = checkClamav(message, host, port)
+        port = self.getConfigItem('spamfilter', 'clamav_port', 3310)
+        timeout = self.getConfigItem('spamfilter', 'clamav_timeout', 30)
+        virus_type = checkClamav(message, host, port, timeout)
         if virus_type:
             # The message is a virus and must be quarantined.
             virus = Virus(mail_from=self.mail_from, helo=self.remote_host,
@@ -185,11 +190,14 @@ def checkSpamassassin(message, host=None):
 
     return False, score, ','.join(tests)
 
-def checkClamav(message, host, port):
+def checkClamav(message, host, port, timeout):
+    timeout = float(timeout)
+    port = int(port)
+
     # Open a socket to the CLAMAV daemon.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((host, port))
-    s.settimeout(5.0)
+    s.settimeout(timeout)
     s.sendall('STREAM\n')
     response = s.recv(1024)
 
@@ -197,7 +205,7 @@ def checkClamav(message, host, port):
     port = re.search(r'PORT\s+(\d+)', response).group(1)
     stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     stream.connect((host, int(port)))
-    stream.settimeout(5.0)
+    stream.settimeout(timeout)
     stream.sendall(message)
     stream.close()
 

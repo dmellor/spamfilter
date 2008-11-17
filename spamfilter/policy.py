@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import logging
 from spamfilter.mixin import ConfigMixin, createSession
 
 class Policy(ConfigMixin):
@@ -48,9 +49,11 @@ class Policy(ConfigMixin):
                 session.rollback()
                 session.clear()
                 err_status = str(exc)
+                logging.info('policy failed: %s', err_status)
                 retries += 1
-                time.sleep(
-                    int(self.getConfigItem('general', 'wait', 5)))
+                wait_time = int(self.getConfigItem('general', 'wait', 5))
+                logging.info('sleeping for %s seconds', wait_time)
+                time.sleep(wait_time)
 
         return action, err_status
 
