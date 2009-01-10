@@ -104,7 +104,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
     def checkSpam(self, message):
         # Check the message and accept it if it is not spam.
-        ok, score, tests = checkSpamassassin(message)
+        max_len = self.getConfigItem('spamfilter', 'max_message_length')
+        ok, score, tests = checkSpamassassin(message, max_len)
         if not ok:
             # The message is spam. In case of false positives, the message is
             # quarantined.
@@ -149,8 +150,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         
         return recips.keys()
 
-def checkSpamassassin(message, host=None):
-    command = ['/usr/bin/spamc', '-R', '-x']
+def checkSpamassassin(message, max_len=100000, host=None):
+    command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
     if host:
         command.extend(['-d', host])
         
