@@ -150,7 +150,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         
         return recips.keys()
 
-def checkSpamassassin(message, max_len=100000, host=None):
+def checkSpamassassin(message, max_len, host=None):
     command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
     if host:
         command.extend(['-d', host])
