@@ -211,10 +211,19 @@ class ReportGenerator(ConfigMixin):
         mailServer.quit()
 
 def translate(text):
-    try:
-        chunks = decode_header(text)
-        translated = [codecs.getdecoder(x[1])(x[0])[0] for x in chunks]
-        translated = u' '.join(translated)
-        return codecs.getencoder('utf8')(translated)[0]
-    except:
+    if text:
+        try:
+            chunks = decode_header(text)
+            translated = []
+            for chunk in chunks:
+                if chunk[1]:
+                    translated.append(codecs.getdecoder(chunk[1])(chunk[0])[0])
+                else:
+                    translated.append(unicode(chunk[0]))
+
+            translated = u' '.join(translated)
+            return codecs.getencoder('utf8')(translated)[0]
+        except:
+            return text
+    else:
         return text
