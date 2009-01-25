@@ -7,6 +7,8 @@ import sys
 import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 from sqlalchemy import select, text
+import codecs
+from email.header import decode_header
 
 from spamfilter.mixin import ConfigMixin, createSession
 from spamfilter.model.spam import Spam, SpamRecipient, spam_recipients_table
@@ -15,7 +17,7 @@ HEADERS = '''From: <do_not_reply@${domain}>
 To: $recipient
 Date: $rfcdate
 Subject: Spam quarantine summary $subject_date
-Content-Type: text/html; charset=iso-8859-1
+Content-Type: text/html; charset=utf8
 Content-Transfer-Encoding: 8bit
 
 '''
@@ -191,7 +193,7 @@ class ReportGenerator(ConfigMixin):
             delivery_id = digest.hexdigest()
             msg_text.append(
                 row_template.substitute(
-                    mail_from=msg.mail_from, subject=msg.subject,
+                    mail_from=msg.mail_from, subject=translate(msg.subject),
                     msg_date=msg_date, delivery_id=delivery_id, colour=colour,
                     host=host))
             for spam_recipient in msg.recipients:
@@ -207,3 +209,12 @@ class ReportGenerator(ConfigMixin):
         mailServer.sendmail(sender, actual_recipient, ''.join(msg_text),
                             ['BODY=8BITMIME'])
         mailServer.quit()
+
+def translate(text):
+    try:
+        chunks = decode_header(text)
+        translated = [codecs.getdecoder(x[1])(x[0])[0] for x in chunks]
+        translated = u' '.join(translated)
+        return codecs.getencoder('utf8')(translated)[0]
+    except:
+        return text
