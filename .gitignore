@@ -1,2 +1,2 @@
-syntax: glob
+*.pyc
 schema/spamassassin-*.gz
