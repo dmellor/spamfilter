@@ -1,7 +1,6 @@
 from spamfilter.policy import Policy
 from spamfilter.model.spam import Spam
 from spamfilter.model.greylist import createGreylistClass
-from spamfilter.model.blacklist import Blacklist
 from spamfilter.greylist import isGreylisted
 from spamfilter.mixin import createSession
 
@@ -43,40 +42,33 @@ class BlacklistPolicy(Policy):
         return action, err_status
 
     def processRequestInSession(self, session):
-        ip_address = self.values.get('client_address')
-        query = session.query(Spam)
-        num = query.filter_by(ip_address=ip_address).count()
+        ip_num, helo_num = getBlacklistThresholds(session, self.values)
+        if ip_num >= helo_num:
+            num = ip_num
+            parameter = self.values.get('client_address')
+        else:
+            num = helo_num
+            parameter = self.values.get('helo_name')
+
         if num >= self.hard_threshold:
-            session.save(Blacklist(ip_address=ip_address))
-            return HARD_REJECTED % ip_address
+            return HARD_REJECTED % parameter
         elif num >= self.soft_threshold:
             rcpt_to = self.values.get('recipient')
             mail_from = self.values.get('sender') or None
+            ip_address = self.values.get('client_address')
             if isGreylisted(session, ip_address, rcpt_to, mail_from,
                             self.greylist_class):
-                session.save(Blacklist(ip_address=ip_address))
-                return SOFT_REJECTED % ip_address
+                return SOFT_REJECTED % parameter
             else:
-                removeBlacklistEntries(session, ip_address)
                 return ACCEPTED
         else:
-            helo = self.values.get('helo_name')
-            num = query.filter_by(helo=helo).count()
-            if num >= self.soft_threshold:
-                rcpt_to = self.values.get('recipient')
-                mail_from = self.values.get('sender') or None
-                if isGreylisted(session, ip_address, rcpt_to, mail_from,
-                                self.greylist_class):
-                    session.save(Blacklist(ip_address=ip_address))
-                    return SOFT_REJECTED % helo
-                else:
-                    removeBlacklistEntries(session, ip_address)
-                    return ACCEPTED
-            else:
-                removeBlacklistEntries(session, ip_address)
-                return ACCEPTED
+            return ACCEPTED
 
-def removeBlacklistEntries(session, ip_address):
-    query = session.query(Blacklist).filter_by(ip_address=ip_address)
-    for entry in query.all():
-        session.delete(entry)
+def getBlacklistThresholds(session, values):
+    query = session.query(Spam)
+    ip_address = values.get('client_address')
+    ip_num = query.filter_by(ip_address=ip_address).count()
+    helo = values.get('helo_name')
+    helo_num = query.filter_by(helo=helo).count()
+
+    return ip_num, helo_num

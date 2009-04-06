@@ -99,7 +99,7 @@ CREATE FUNCTION extract_header(text, text) RETURNS text
 	headerText text DEFAULT NULL;
 BEGIN
 	headerString := ''
-'' || header || '': '';	
+'' || header || '':'';	
 	startPos := strpos(content, headerString);
 	IF startPos > 0 THEN
 		headerText := substr(content, startPos + length(headerString),
@@ -108,6 +108,8 @@ BEGIN
 '');
 		headerText := substr(headerText, 1, endPos - 1);
 	END IF;
+
+	headerText := trim(both from headerText);
 
 	RETURN headerText;
 END;'
@@ -214,19 +216,6 @@ CREATE SEQUENCE auto_whitelist_id_seq
 ALTER TABLE public.auto_whitelist_id_seq OWNER TO david;
 
 --
--- Name: blacklist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE blacklist (
-    id serial NOT NULL,
-    ip_address character varying(15) NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.blacklist OWNER TO david;
-
---
 -- Name: domain_names; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -297,24 +286,6 @@ CREATE SEQUENCE quarantine_recipients_id_seq
 ALTER TABLE public.quarantine_recipients_id_seq OWNER TO david;
 
 --
--- Name: spam; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE spam (
-    id integer DEFAULT nextval(('spam_id_seq'::text)::regclass) NOT NULL,
-    mail_from character varying(1024),
-    ip_address character varying(15) NOT NULL,
-    helo character varying(1024) NOT NULL,
-    contents text NOT NULL,
-    score double precision NOT NULL,
-    tests text NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.spam OWNER TO david;
-
---
 -- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -326,6 +297,24 @@ CREATE SEQUENCE spam_id_seq
 
 
 ALTER TABLE public.spam_id_seq OWNER TO david;
+
+--
+-- Name: spam; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE spam (
+    id integer DEFAULT nextval('spam_id_seq'::regclass) NOT NULL,
+    mail_from character varying(1024),
+    ip_address character varying(15) NOT NULL,
+    helo character varying(1024) NOT NULL,
+    contents text NOT NULL,
+    score double precision NOT NULL,
+    tests text NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.spam OWNER TO david;
 
 --
 -- Name: spam_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
@@ -381,23 +370,6 @@ CREATE SEQUENCE virus_recipients_id_seq
 ALTER TABLE public.virus_recipients_id_seq OWNER TO david;
 
 --
--- Name: viruses; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE viruses (
-    id integer DEFAULT nextval(('viruses_id_seq'::text)::regclass) NOT NULL,
-    mail_from character varying(1024),
-    ip_address character varying(15) NOT NULL,
-    helo character varying(1024) NOT NULL,
-    contents text NOT NULL,
-    virus character varying(1024) NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.viruses OWNER TO david;
-
---
 -- Name: viruses_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -409,6 +381,23 @@ CREATE SEQUENCE viruses_id_seq
 
 
 ALTER TABLE public.viruses_id_seq OWNER TO david;
+
+--
+-- Name: viruses; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE viruses (
+    id integer DEFAULT nextval('viruses_id_seq'::regclass) NOT NULL,
+    mail_from character varying(1024),
+    ip_address character varying(15) NOT NULL,
+    helo character varying(1024) NOT NULL,
+    contents text NOT NULL,
+    virus character varying(1024) NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.viruses OWNER TO david;
 
 --
 -- Name: whitelist_from_id_seq; Type: SEQUENCE; Schema: public; Owner: david
@@ -429,14 +418,6 @@ ALTER TABLE public.whitelist_from_id_seq OWNER TO david;
 
 ALTER TABLE ONLY auto_whitelist
     ADD CONSTRAINT auto_whitelist_pkey PRIMARY KEY (id);
-
-
---
--- Name: blacklist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
---
-
-ALTER TABLE ONLY blacklist
-    ADD CONSTRAINT blacklist_pkey PRIMARY KEY (id);
 
 
 --
@@ -508,13 +489,6 @@ ALTER TABLE ONLY viruses
 --
 
 CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (username, email, ip);
-
-
---
--- Name: blacklist_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE INDEX blacklist_ip_address ON blacklist USING btree (ip_address);
 
 
 --
@@ -629,26 +603,6 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
 
 
 --
--- Name: blacklist; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE blacklist FROM PUBLIC;
-REVOKE ALL ON TABLE blacklist FROM david;
-GRANT ALL ON TABLE blacklist TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE blacklist TO qmail;
-
-
---
--- Name: blacklist_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE blacklist_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE blacklist_id_seq FROM david;
-GRANT ALL ON TABLE blacklist_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE blacklist_id_seq TO qmail;
-
-
---
 -- Name: domain_names; Type: ACL; Schema: public; Owner: david
 --
 
@@ -689,16 +643,6 @@ GRANT SELECT ON TABLE quarantine_recipients TO qmail;
 
 
 --
--- Name: spam; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE spam FROM PUBLIC;
-REVOKE ALL ON TABLE spam FROM david;
-GRANT ALL ON TABLE spam TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
-
-
---
 -- Name: spam_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
@@ -706,6 +650,16 @@ REVOKE ALL ON TABLE spam_id_seq FROM PUBLIC;
 REVOKE ALL ON TABLE spam_id_seq FROM david;
 GRANT ALL ON TABLE spam_id_seq TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_id_seq TO qmail;
+
+
+--
+-- Name: spam; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam FROM PUBLIC;
+REVOKE ALL ON TABLE spam FROM david;
+GRANT ALL ON TABLE spam TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
 
 
 --
@@ -749,16 +703,6 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients_id_seq TO qmail;
 
 
 --
--- Name: viruses; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE viruses FROM PUBLIC;
-REVOKE ALL ON TABLE viruses FROM david;
-GRANT ALL ON TABLE viruses TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses TO qmail;
-
-
---
 -- Name: viruses_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
@@ -766,6 +710,16 @@ REVOKE ALL ON TABLE viruses_id_seq FROM PUBLIC;
 REVOKE ALL ON TABLE viruses_id_seq FROM david;
 GRANT ALL ON TABLE viruses_id_seq TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses_id_seq TO qmail;
+
+
+--
+-- Name: viruses; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE viruses FROM PUBLIC;
+REVOKE ALL ON TABLE viruses FROM david;
+GRANT ALL ON TABLE viruses TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses TO qmail;
 
 
 --
