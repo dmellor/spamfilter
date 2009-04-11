@@ -7,5 +7,5 @@ cd $directory
 exec python -c '
 import sys
 from spamfilter.blacklist import BlacklistPolicy
-BlacklistPolicy(config=sys.argv[1], dbkeys=sys.argv[2:]).process()
-sys.exit(0)' config.ini "$@"
+BlacklistPolicy(config=sys.argv[1]).process()
+sys.exit(0)' config.ini
