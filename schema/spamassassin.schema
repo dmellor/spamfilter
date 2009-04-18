@@ -228,24 +228,6 @@ CREATE TABLE domain_names (
 ALTER TABLE public.domain_names OWNER TO david;
 
 --
--- Name: greylist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE greylist (
-    id integer DEFAULT nextval(('greylist_id_seq'::text)::regclass) NOT NULL,
-    ip_address character varying(11) NOT NULL,
-    mail_from character varying(1024),
-    rcpt_to character varying(1024) NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL,
-    modified timestamp with time zone NOT NULL,
-    successful integer DEFAULT 0 NOT NULL,
-    unsuccessful integer DEFAULT 0 NOT NULL
-);
-
-
-ALTER TABLE public.greylist OWNER TO david;
-
---
 -- Name: greylist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -257,6 +239,25 @@ CREATE SEQUENCE greylist_id_seq
 
 
 ALTER TABLE public.greylist_id_seq OWNER TO david;
+
+--
+-- Name: greylist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE greylist (
+    id integer DEFAULT nextval('greylist_id_seq'::regclass) NOT NULL,
+    ip_address character varying(11) NOT NULL,
+    mail_from character varying(1024),
+    rcpt_to character varying(1024) NOT NULL,
+    last_instance character varying(255),
+    successful integer DEFAULT 0 NOT NULL,
+    unsuccessful integer DEFAULT 0 NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    modified timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE public.greylist OWNER TO david;
 
 --
 -- Name: quarantine_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
@@ -613,16 +614,6 @@ GRANT SELECT ON TABLE domain_names TO qmail;
 
 
 --
--- Name: greylist; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE greylist FROM PUBLIC;
-REVOKE ALL ON TABLE greylist FROM david;
-GRANT ALL ON TABLE greylist TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist TO qmail;
-
-
---
 -- Name: greylist_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
@@ -630,6 +621,16 @@ REVOKE ALL ON TABLE greylist_id_seq FROM PUBLIC;
 REVOKE ALL ON TABLE greylist_id_seq FROM david;
 GRANT ALL ON TABLE greylist_id_seq TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist_id_seq TO qmail;
+
+
+--
+-- Name: greylist; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE greylist FROM PUBLIC;
+REVOKE ALL ON TABLE greylist FROM david;
+GRANT ALL ON TABLE greylist TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist TO qmail;
 
 
 --
