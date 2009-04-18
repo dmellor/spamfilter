@@ -29,9 +29,8 @@ class GreylistPolicy(Policy):
         rcpt_to = self.values.get('recipient')
         mail_from = self.values.get('sender') or None
         ip_address = self.values.get('client_address')
-        threshold = int(self.getConfigItem('greylist', 'auto_threshold', 3))
         if isGreylisted(self.session, ip_address, rcpt_to, mail_from,
-                        self.greylist_class, threshold):
+                        self.greylist_class):
             return REJECTED
         else:
             return ACCEPTED

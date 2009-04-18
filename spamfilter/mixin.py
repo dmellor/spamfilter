@@ -39,8 +39,7 @@ def queryPostfixDB(db, item):
     else:
         return False
 
-def isGreylisted(session, ip_address, rcpt_to, mail_from, greylist_class,
-                 threshold=None):
+def isGreylisted(session, ip_address, rcpt_to, mail_from, greylist_class):
     ip_address = '.'.join(ip_address.split('.')[:3])
     rcpt_to = rcpt_to.lower()
     if mail_from:
