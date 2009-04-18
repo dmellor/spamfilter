@@ -1,6 +1,5 @@
 import sys
 import re
-from sqlalchemy import *
 import spamfilter.model.greylist as greylist
 from spamfilter.policy import Policy
 from spamfilter.blacklist import BlacklistPolicy
