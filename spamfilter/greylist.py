@@ -1,36 +1,76 @@
-import sys
-import re
-import spamfilter.model.greylist as greylist
-from spamfilter.policy import Policy
-from spamfilter.blacklist import BlacklistPolicy
-from spamfilter.mixin import isGreylisted
+from spamfilter.model.greylist import createGreylistClass
+from spamfilter.policy import Policy, ACCEPTED
+from spamfilter.mixin import queryPostfixDB
 
-ACCEPTED = 'dunno'
 REJECTED = \
     'defer_if_permit System temporarily unavailable, please try again later'
 
 class GreylistPolicy(Policy):
-    def __init__(self, **kws):
-        super(GreylistPolicy, self).__init__(**kws)
-        self.greylist_class = greylist.createGreylistClass(
-            self.getConfigItem('greylist', 'interval', 30))
-        self.blacklist = BlacklistPolicy(policy=self)
+    def __init__(self, manager):
+        super(GreylistPolicy, self).__init__(manager)
+        self.loadGreylistClass()
+
+    def loadGreylistClass(self):
+        self.greylist_class = createGreylistClass(
+            self.manager.getConfigItem('greylist', 'interval', 30))
 
     def processRequest(self):
-        # First check if the current IP address is blacklisted. If it is, then
-        # the blacklist policy will have already handled this message and there
-        # is nothing further that needs to be done here. This is necessary
-        # because Postfix still evalutes the recipient restrictions even if the
-        # sender restrictions have already rejected the message.
-        if max(self.blacklist.getBlacklistThresholds()) != 0:
+        # Determine the greylist tuple, and check if the recipient should be
+        # subjected to the greylist policy.
+        rcpt_to, mail_from, ip_address = self.getGreylistTuple()
+        nogreylist_db = self.manager.getConfigItem('greylist', 'nogreylist_db',
+                                                   None)
+        if nogreylist_db and queryPostfixDB(nogreylist_db, rcpt_to):
             return ACCEPTED
 
-        # Check if the current message should be greylisted.
-        rcpt_to = self.values.get('recipient')
-        mail_from = self.values.get('sender') or None
-        ip_address = self.values.get('client_address')
-        if isGreylisted(self.session, ip_address, rcpt_to, mail_from,
-                        self.greylist_class):
-            return REJECTED
+        # First check if the current message instance has already been
+        # processed by the blacklist policy, which will be the case if the
+        # message was blacklisted. If so, then the blacklist policy will have
+        # already determined the outcome for this message and there is nothing
+        # further that needs to be done here. This requires that the blacklist
+        # policy appear before the greylist policy in the configuration file.
+        instance = self.manager.get('instance')
+        record = self.getGreylistRecord(rcpt_to, mail_from, ip_address)
+        if record:
+            if instance == record.last_instance:
+                # Message already handled by the blacklist policy
+                return ACCEPTED
+            elif record.accepted:
+                record.last_instance = instance
+                record.successful += 1
+                return ACCEPTED
+            else:
+                record.last_instance = instance
+                record.unsuccessful += 1
+                return REJECTED
         else:
-            return ACCEPTED
+            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance)
+            return REJECTED
+
+    def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
+        # Load the record - this will be null if the tuple has not been seen
+        # before.
+        query = self.manager.session.query(self.greylist_class)
+        query = query.filter_by(ip_address=ip_address, mail_from=mail_from,
+                                rcpt_to=rcpt_to)
+        return query.first()
+
+    def getGreylistTuple(self):
+        rcpt_to = self.manager.get('recipient').lower()
+        mail_from = self.manager.get('sender') or None
+        if mail_from:
+            mail_from = mail_from.lower()
+
+        ip_address = self.manager.get('client_address')
+        ip_address = '.'.join(ip_address.split('.')[:3])
+
+        return rcpt_to, mail_from, ip_address
+
+    def createGreylistRecord(self, rcpt_to, mail_from, ip_address, instance):
+        record = self.greylist_class()
+        record.ip_address = ip_address
+        record.mail_from = mail_from
+        record.rcpt_to = rcpt_to
+        record.last_instance = instance
+        record.unsuccessful = 1
+        self.manager.session.save(record)

@@ -4,17 +4,33 @@ import time
 import logging
 from spamfilter.mixin import ConfigMixin, createSession
 
-class Policy(ConfigMixin):
-    def __init__(self, config=None, policy=None):
-        if policy:
-            self.values = policy.values
-            self.config = policy.config
-            self.session = policy.session
-        else:
-            self.values = {}
-            self.readConfig(config)
-            self.session = createSession(
-                self.getConfigItem('database', 'dburi'))
+ACCEPTED = 'dunno'
+
+class PolicyManager(ConfigMixin):
+    def __init__(self, config):
+        self.values = {}
+        self.readConfig(config)
+        self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.loadPolicies()
+
+    def loadPolicies(self):
+        self.policies = []
+        num = 0
+        while True:
+            num += 1
+            class_name = self.getConfigItem('policies', 'policy%s' % num, None)
+            if not class_name:
+                break
+
+            module, sep, klass = class_name.rpartition('.')
+            klass = __import__(module)
+            for component in class_name.split('.')[1:]:
+                klass = getattr(klass, component)
+
+            self.policies.append(klass(manager=self))
+
+    def get(self, key):
+        return self.values.get(key)
 
     def process(self):
         name_value = re.compile('^([^=]*)=(.*)')
@@ -42,10 +58,14 @@ class Policy(ConfigMixin):
         retries = 0
         num_retries = int(self.getConfigItem('general', 'retries', 2))
         while retries < num_retries:
-            action = None
+            action = ACCEPTED
             err_status = None
             try:
-                action = self.processRequest()
+                for policy in self.policies:
+                    action = policy.processRequest()
+                    if action != ACCEPTED:
+                        break
+
                 self.session.commit()
                 break
             except Exception, exc:
@@ -59,6 +79,10 @@ class Policy(ConfigMixin):
                 time.sleep(wait_time)
 
         return action, err_status
+
+class Policy(object):
+    def __init__(self, manager):
+        self.manager = manager
 
     def processRequest(self):
         raise Exception('Implementation not found')
