@@ -23,17 +23,20 @@ class GreylistPolicy(Policy):
         if nogreylist_db and queryPostfixDB(nogreylist_db, rcpt_to):
             return ACCEPTED
 
-        # First check if the current message instance has already been
-        # processed by the blacklist policy, which will be the case if the
-        # message was blacklisted. If so, then the blacklist policy will have
-        # already determined the outcome for this message and there is nothing
-        # further that needs to be done here. This requires that the blacklist
-        # policy appear before the greylist policy in the configuration file.
+        return self.greylist(rcpt_to, mail_from, ip_address, REJECTED)
+
+    def greylist(self, rcpt_to, mail_from, ip_address, error_msg):
         instance = self.manager.get('instance')
         record = self.getGreylistRecord(rcpt_to, mail_from, ip_address)
         if record:
             if instance == record.last_instance:
-                # Message already handled by the blacklist policy
+                # First check if the current message instance has already been
+                # processed by a previous GreylistPolicy, which will be the
+                # case if the message was blacklisted. If so, then the
+                # blacklist policy will have already determined the outcome for
+                # this message and there is nothing further that needs to be
+                # done here. This requires that the blacklist policy appear
+                # before the greylist policy in the configuration file.
                 return ACCEPTED
             elif record.accepted:
                 record.last_instance = instance
@@ -42,10 +45,11 @@ class GreylistPolicy(Policy):
             else:
                 record.last_instance = instance
                 record.unsuccessful += 1
-                return REJECTED
+                return error_msg
         else:
-            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance)
-            return REJECTED
+            self.createGreylistRecord(rcpt_to, mail_from, ip_address,
+                                      instance)
+            return error_msg
 
     def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
         # Load the record - this will be null if the tuple has not been seen

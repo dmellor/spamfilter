@@ -5,14 +5,19 @@ from spamfilter.model.greylist import createGreylistClass
 
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
 HARD_REJECTED = 'reject Spam has recently been received from %s'
+CLASSC_REJECTED = \
+    'defer_if_permit Spam has recently been received from your network'
 
 class BlacklistPolicy(GreylistPolicy):
     def __init__(self, manager):
         super(BlacklistPolicy, self).__init__(manager)
-        self.soft_threshold = int(manager.getConfigItem('blacklist',
-                                                        'soft_threshold', 1))
-        self.hard_threshold = int(manager.getConfigItem('blacklist',
-                                                        'hard_treshold', 3))
+        self.soft_threshold = int(manager.getConfigItem(
+            'blacklist', 'soft_threshold', 1))
+        self.hard_threshold = int(manager.getConfigItem(
+            'blacklist', 'hard_treshold', 3))
+        self.classc_threshold = int(manager.getConfigItem(
+            'blacklist', 'classc_threshold', 3))
+
     def loadGreylistClass(self):
         self.greylist_class = createGreylistClass(
             self.manager.getConfigItem('blacklist', 'interval', 720))
@@ -26,28 +31,15 @@ class BlacklistPolicy(GreylistPolicy):
             num = helo_num
             parameter = self.manager.get('helo_name')
 
+        rcpt_to, mail_from, ip_address = self.getGreylistTuple()
         if num >= self.hard_threshold:
             return HARD_REJECTED % parameter
         elif num >= self.soft_threshold:
-            instance = self.manager.get('instance')
-            rcpt_to, mail_from, ip_address = self.getGreylistTuple()
-            record = self.getGreylistRecord(rcpt_to, mail_from, ip_address)
-            if record:
-                if instance == record.last_instance:
-                    # Already handled by a previous policy.
-                    return ACCEPTED
-                elif record.accepted:
-                    record.last_instance = instance
-                    record.successful += 1
-                    return ACCEPTED
-                else:
-                    record.last_instance = instance
-                    record.unsuccessful += 1
-                    return SOFT_REJECTED % parameter
-            else:
-                self.createGreylistRecord(rcpt_to, mail_from, ip_address,
-                                          instance)
-                return SOFT_REJECTED % parameter
+            return self.greylist(rcpt_to, mail_from, ip_address,
+                                 SOFT_REJECTED % parameter)
+        elif self.getClasscSpamCount(ip_address) >= self.classc_threshold:
+            return self.greylist(rcpt_to, mail_from, ip_address,
+                                 CLASSC_REJECTED)
         else:
             return ACCEPTED
 
@@ -57,5 +49,10 @@ class BlacklistPolicy(GreylistPolicy):
         ip_num = query.filter_by(ip_address=ip_address).count()
         helo = self.manager.get('helo_name')
         helo_num = query.filter_by(helo=helo).count()
-
         return ip_num, helo_num
+
+    def getClasscSpamCount(self, ip_address):
+        query = self.manager.session.query(Spam)
+        classc = '.'.join(ip_address.split('.')[0:3])
+        classc = '%s.%%' % classc
+        return query.filter(Spam.ip_address.like(classc)).count()
