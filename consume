@@ -1,0 +1,11 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+. bin/activate
+exec python -c '
+import sys
+from spamfilter.consume import SpamConsumer
+SpamConsumer(config=sys.argv[1]).process()
+sys.exit(0)' config.ini
