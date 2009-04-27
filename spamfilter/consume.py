@@ -1,4 +1,4 @@
-import re, sys, logging
+import re, sys
 from email.parser import FeedParser
 from cStringIO import StringIO
 from email.generator import Generator
@@ -56,7 +56,8 @@ class SpamConsumer(ConfigMixin):
                         found_helo = True
 
                     match = re.search(r'\[([\d\.]+)\]', line)
-                    ips.append(match.group(1))
+                    if match:
+                        ips.append(match.group(1))
 
         fp = StringIO()
         g = Generator(fp, mangle_from_=False)
@@ -66,9 +67,8 @@ class SpamConsumer(ConfigMixin):
         self.session.save(spam)
 
         # Remove the greylist entry.
-        klass = createGreylistClass()
-        query = self.session.query(klass)
-        recipient = message['X-Original-To']
+        query = self.session.query(createGreylistClass())
+        recipient = message.get_all('X-Original-To')[0]
         classc = '.'.join(ips[0].split('.')[0:3])
         query = query.filter_by(rcpt_to=recipient, mail_from=mail_from,
                                 ip_address=classc)
@@ -77,6 +77,7 @@ class SpamConsumer(ConfigMixin):
             self.session.delete(greylist)
 
         # Update the auto-whitelist score.
+        mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
         query = self.session.query(AutoWhitelist)
         query = query.filter_by(email=mail_from)
         for ip in ips:
@@ -84,3 +85,4 @@ class SpamConsumer(ConfigMixin):
             record = query.filter_by(ip=classb).first()
             if record:
                 record.totscore += 1000
+                record.count += 1
