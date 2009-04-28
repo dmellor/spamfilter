@@ -6,6 +6,7 @@ cd $directory
 . bin/activate
 exec python -c '
 import sys
+sys.argv[0] = "policy"
 from spamfilter.policy import PolicyManager
 PolicyManager(config=sys.argv[1]).process()
 sys.exit(0)' config.ini

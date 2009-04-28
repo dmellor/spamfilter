@@ -6,6 +6,7 @@ cd $directory
 . bin/activate
 exec python -c '
 import sys
+sys.argv[0] = "report"
 from spamfilter.report import ReportGenerator
 ReportGenerator(config=sys.argv[1]).report()
 sys.exit(0)' config.ini
