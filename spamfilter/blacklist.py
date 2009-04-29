@@ -5,8 +5,10 @@ from spamfilter.model.greylist import createGreylistClass
 
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
 HARD_REJECTED = 'reject Spam has recently been received from %s'
-CLASSC_REJECTED = \
+SOFT_CLASSC_REJECTED = \
     'defer_if_permit Spam has recently been received from your network'
+HARD_CLASSC_REJECTED = \
+    'reject Spam has recently been received from your network'
 
 class BlacklistPolicy(GreylistPolicy):
     def __init__(self, manager):
@@ -15,8 +17,10 @@ class BlacklistPolicy(GreylistPolicy):
             'blacklist', 'soft_threshold', 1))
         self.hard_threshold = int(manager.getConfigItem(
             'blacklist', 'hard_treshold', 3))
-        self.classc_threshold = int(manager.getConfigItem(
-            'blacklist', 'classc_threshold', 3))
+        self.soft_classc_threshold = int(manager.getConfigItem(
+            'blacklist', 'soft_classc_threshold', 2))
+        self.hard_classc_threshold = int(manager.getConfigItem(
+            'blacklist', 'hard_classc_threshold', 5))
 
     def loadGreylistClass(self):
         self.greylist_class = createGreylistClass(
@@ -37,9 +41,13 @@ class BlacklistPolicy(GreylistPolicy):
         elif num >= self.soft_threshold:
             return self.greylist(rcpt_to, mail_from, ip_address,
                                  SOFT_REJECTED % parameter)
-        elif self.getClasscSpamCount(ip_address) >= self.classc_threshold:
+
+        classc_count = self.getClasscSpamCount(ip_address)
+        if classc_count >= self.hard_classc_threshold:
+            return HARD_CLASSC_REJECTED
+        elif classc_count >= self.soft_classc_threshold:
             return self.greylist(rcpt_to, mail_from, ip_address,
-                                 CLASSC_REJECTED)
+                                 SOFT_CLASSC_REJECTED)
         else:
             return ACCEPTED
 
