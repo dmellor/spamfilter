@@ -1,7 +1,8 @@
 from spamfilter.policy import ACCEPTED
 from spamfilter.greylist import GreylistPolicy
-from spamfilter.model.spam import Spam
+from spamfilter.model.spam import Spam, spam_table
 from spamfilter.model.greylist import createGreylistClass
+from sqlalchemy.sql import select, func
 
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
 HARD_REJECTED = 'reject Spam has recently been received from %s'
@@ -42,12 +43,15 @@ class BlacklistPolicy(GreylistPolicy):
             return self.greylist(rcpt_to, mail_from, ip_address,
                                  SOFT_REJECTED % parameter)
 
-        classc_count = self.getClasscSpamCount(ip_address)
-        if classc_count >= self.hard_classc_threshold:
-            return HARD_CLASSC_REJECTED
-        elif classc_count >= self.soft_classc_threshold:
-            return self.greylist(rcpt_to, mail_from, ip_address,
-                                 SOFT_CLASSC_REJECTED)
+        classc_count, distinct_count = self.getClasscSpamCount(ip_address)
+        if distinct_count > 1:
+            if classc_count >= self.hard_classc_threshold:
+                return HARD_CLASSC_REJECTED
+            elif classc_count >= self.soft_classc_threshold:
+                return self.greylist(rcpt_to, mail_from, ip_address,
+                                     SOFT_CLASSC_REJECTED)
+            else:
+                return ACCEPTED
         else:
             return ACCEPTED
 
@@ -60,7 +64,10 @@ class BlacklistPolicy(GreylistPolicy):
         return ip_num, helo_num
 
     def getClasscSpamCount(self, ip_address):
-        query = self.manager.session.query(Spam)
         classc = '.'.join(ip_address.split('.')[0:3])
         classc = '%s.%%' % classc
-        return query.filter(Spam.ip_address.like(classc)).count()
+        query = select([func.count(spam_table.c.ip_address),
+            func.count(func.distinct(spam_table.c.ip_address))],
+            spam_table.c.ip_address.like(classc))
+        connection = self.manager.session.connection()
+        return connection.execute(query).fetchone()
