@@ -67,7 +67,7 @@ class BlacklistPolicy(GreylistPolicy):
         classc = '.'.join(ip_address.split('.')[:3])
         classc = '%s.%%' % classc
         query = select([func.count(spam_table.c.ip_address),
-            func.count(func.distinct(spam_table.c.ip_address))],
+            func.count(spam_table.c.ip_address.distinct())],
             spam_table.c.ip_address.like(classc))
         connection = self.manager.session.connection()
         return connection.execute(query).fetchone()
