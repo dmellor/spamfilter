@@ -109,7 +109,7 @@ class NetCommand(object):
         Returns the most significant digit of the current status code. If a
         command is pending then CMD_PENDING is returned.
         """
-        return int(self.net_cmd_code.substring[0:1])
+        return int(self.net_cmd_code[0])
     
     def setStatus(self, code, resp):
         if not isinstance(resp, list):
