@@ -69,7 +69,7 @@ class SpamConsumer(ConfigMixin):
         # Remove the greylist entry.
         query = self.session.query(createGreylistClass())
         recipient = message.get_all('X-Original-To')[0]
-        classc = '.'.join(ips[0].split('.')[0:3])
+        classc = '.'.join(ips[0].split('.')[:3])
         query = query.filter_by(rcpt_to=recipient, mail_from=mail_from,
                                 ip_address=classc)
         greylist = query.first()
@@ -81,7 +81,7 @@ class SpamConsumer(ConfigMixin):
         query = self.session.query(AutoWhitelist)
         query = query.filter_by(email=mail_from)
         for ip in ips:
-            classb = '.'.join(ip.split('.')[0:2])
+            classb = '.'.join(ip.split('.')[:2])
             record = query.filter_by(ip=classb).first()
             if record:
                 record.totscore += 1000

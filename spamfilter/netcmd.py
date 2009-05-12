@@ -259,7 +259,7 @@ class NetCommand(object):
             self.net_cmd_code = code
             self.net_cmd_resp.append(line)
 
-        return int(code[0:1])
+        return int(code[0])
     
     def readUntilDot(self, fp=None):
         """

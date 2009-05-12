@@ -64,7 +64,7 @@ class BlacklistPolicy(GreylistPolicy):
         return ip_num, helo_num
 
     def getClasscSpamCount(self, ip_address):
-        classc = '.'.join(ip_address.split('.')[0:3])
+        classc = '.'.join(ip_address.split('.')[:3])
         classc = '%s.%%' % classc
         query = select([func.count(spam_table.c.ip_address),
             func.count(func.distinct(spam_table.c.ip_address))],

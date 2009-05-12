@@ -5,7 +5,7 @@ class ConfigMixin(object):
         self.config.read(config_file)
 
     def getConfigItem(self, *args):
-        section, name = args[0:2]
+        section, name = args[:2]
         try:
             return self.config.get(section, name)
         except:
