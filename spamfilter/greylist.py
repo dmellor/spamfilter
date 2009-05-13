@@ -71,10 +71,7 @@ class GreylistPolicy(Policy):
         return rcpt_to, mail_from, ip_address
 
     def createGreylistRecord(self, rcpt_to, mail_from, ip_address, instance):
-        record = self.greylist_class()
-        record.ip_address = ip_address
-        record.mail_from = mail_from
-        record.rcpt_to = rcpt_to
-        record.last_instance = instance
-        record.unsuccessful = 1
+        record = self.greylist_class(ip_address=ip_address, rcpt_to=rcpt_to,
+                                     mail_from=mail_from, unsuccessful=1,
+                                     last_instance=instance)
         self.manager.session.save(record)

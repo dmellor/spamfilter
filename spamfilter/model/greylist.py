@@ -21,7 +21,9 @@ greylist_table = Table(
 def createGreylistClass(interval=None):
 
     class Greylist(object):
-        pass
+        def __init__(self, **kws):
+            for k, v in kws.items():
+                setattr(self, k, v)
 
     if interval:
         mapper(Greylist, greylist_table, properties={
