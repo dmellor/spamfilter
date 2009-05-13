@@ -50,10 +50,9 @@ class BlacklistPolicy(GreylistPolicy):
             elif classc_count >= self.soft_classc_threshold:
                 return self.greylist(rcpt_to, mail_from, ip_address,
                                      SOFT_CLASSC_REJECTED)
-            else:
-                return ACCEPTED
-        else:
-            return ACCEPTED
+
+        # If execution reaches this point then the message is not blacklisted.
+        return ACCEPTED
 
     def getBlacklistThresholds(self):
         query = self.manager.session.query(Spam)
