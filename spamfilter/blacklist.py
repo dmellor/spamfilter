@@ -38,7 +38,8 @@ class BlacklistPolicy(GreylistPolicy):
 
         rcpt_to, mail_from, ip_address = self.getGreylistTuple()
         if num >= self.hard_threshold:
-            return HARD_REJECTED % parameter
+            return self.greylist(rcpt_to, mail_from, ip_address,
+                                 HARD_REJECTED % parameter)
         elif num >= self.soft_threshold:
             return self.greylist(rcpt_to, mail_from, ip_address,
                                  SOFT_REJECTED % parameter)
@@ -46,7 +47,8 @@ class BlacklistPolicy(GreylistPolicy):
         classc_count, distinct_count = self.getClasscSpamCount(ip_address)
         if distinct_count > 1:
             if classc_count >= self.hard_classc_threshold:
-                return HARD_CLASSC_REJECTED
+                return self.greylist(rcpt_to, mail_from, ip_address,
+                                     HARD_CLASSC_REJECTED)
             elif classc_count >= self.soft_classc_threshold:
                 return self.greylist(rcpt_to, mail_from, ip_address,
                                      SOFT_CLASSC_REJECTED)

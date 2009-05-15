@@ -1,4 +1,5 @@
 from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.auto_whitelist import AutoWhitelist
 from spamfilter.policy import Policy, ACCEPTED
 from spamfilter.mixin import queryPostfixDB
 
@@ -40,7 +41,8 @@ class GreylistPolicy(Policy):
                 # done here. This requires that the blacklist policy appear
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
-            elif record.accepted or status == ACCEPTED:
+            elif record.accepted or status == ACCEPTED or \
+                self.isAutoWhitelisted(mail_from, ip_address):
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
@@ -48,10 +50,12 @@ class GreylistPolicy(Policy):
                 record.last_instance = instance
                 record.unsuccessful += 1
                 return status
-        else:
-            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
-                                      status)
-            return status
+
+        # The connection has not been seen before - create a new greylist
+        # record.
+        self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
+                                  status)
+        return status
 
     def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
         # Load the record - this will be null if the tuple has not been seen
@@ -83,3 +87,15 @@ class GreylistPolicy(Policy):
             record.unsuccessful = 1
 
         self.manager.session.save(record)
+
+    def isAutoWhitelisted(self, mail_from, ip_address):
+        query = self.manager.session.query(AutoWhitelist)
+        classb = '.'.join(ip_address.split('.')[:2])
+        record = query.filter_by(email=mail_from, ip=classb).first()
+        if record:
+            threshold = int(self.manager.getConfigItem(
+                'greylist', 'whitelist_threshold', 5))
+            if record.totscore / record.count < threshold:
+                return True
+
+        return False
