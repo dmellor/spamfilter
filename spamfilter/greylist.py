@@ -21,11 +21,13 @@ class GreylistPolicy(Policy):
         nogreylist_db = self.manager.getConfigItem('greylist', 'nogreylist_db',
                                                    None)
         if nogreylist_db and queryPostfixDB(nogreylist_db, rcpt_to):
-            return ACCEPTED
+            status = ACCEPTED
+        else:
+            status = REJECTED
 
-        return self.greylist(rcpt_to, mail_from, ip_address, REJECTED)
+        return self.greylist(rcpt_to, mail_from, ip_address, status)
 
-    def greylist(self, rcpt_to, mail_from, ip_address, error_msg):
+    def greylist(self, rcpt_to, mail_from, ip_address, status):
         instance = self.manager.get('instance')
         record = self.getGreylistRecord(rcpt_to, mail_from, ip_address)
         if record:
@@ -38,18 +40,18 @@ class GreylistPolicy(Policy):
                 # done here. This requires that the blacklist policy appear
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
-            elif record.accepted:
+            elif record.accepted or status == ACCEPTED:
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
             else:
                 record.last_instance = instance
                 record.unsuccessful += 1
-                return error_msg
+                return status
         else:
-            self.createGreylistRecord(rcpt_to, mail_from, ip_address,
-                                      instance)
-            return error_msg
+            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
+                                      status)
+            return status
 
     def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
         # Load the record - this will be null if the tuple has not been seen
@@ -70,8 +72,14 @@ class GreylistPolicy(Policy):
 
         return rcpt_to, mail_from, ip_address
 
-    def createGreylistRecord(self, rcpt_to, mail_from, ip_address, instance):
+    def createGreylistRecord(self, rcpt_to, mail_from, ip_address, instance,
+                             status):
         record = self.greylist_class(ip_address=ip_address, rcpt_to=rcpt_to,
-                                     mail_from=mail_from, unsuccessful=1,
+                                     mail_from=mail_from,
                                      last_instance=instance)
+        if status == ACCEPTED:
+            record.successful = 1
+        else:
+            record.unsuccessful = 1
+
         self.manager.session.save(record)
