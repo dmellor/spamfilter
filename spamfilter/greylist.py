@@ -5,6 +5,7 @@ from spamfilter.mixin import queryPostfixDB
 
 REJECTED = \
     'defer_if_permit System temporarily unavailable, please try again later'
+HARD_REJECTED = 'reject '
 
 class GreylistPolicy(Policy):
     def __init__(self, manager):
@@ -52,9 +53,11 @@ class GreylistPolicy(Policy):
                 return status
 
         # The connection has not been seen before - create a new greylist
-        # record.
-        self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
-                                  status)
+        # record if the status is not a hard rejection.
+        if not status.startswith(HARD_REJECTED):
+            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
+                                      status)
+
         return status
 
     def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
