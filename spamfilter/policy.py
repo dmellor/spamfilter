@@ -70,7 +70,6 @@ class PolicyManager(ConfigMixin):
                 break
             except Exception, exc:
                 self.session.rollback()
-                self.session.clear()
                 err_status = str(exc)
                 logging.info('policy failed: %s', err_status)
                 retries += 1

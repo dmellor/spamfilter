@@ -21,7 +21,7 @@ def createSession(dburi):
     from sqlalchemy.orm import sessionmaker
     global Session
     if not Session:
-        Session = sessionmaker(autoflush=True, transactional=True)
+        Session = sessionmaker()
 
     engine = create_engine(dburi, convert_unicode=False, echo=False)
     session = Session(bind=engine.connect())

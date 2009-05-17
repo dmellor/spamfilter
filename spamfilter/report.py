@@ -118,7 +118,6 @@ class ReportGenerator(ConfigMixin):
                     break
                 except Exception, exc:
                     self.session.rollback()
-                    self.session.clear()
                     attempt += 1
                     if attempt == 5:
                         print "Unable to send report to %s: %s" % \

@@ -66,7 +66,6 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 break
             except Exception, exc:
                 self.session.rollback()
-                self.session.clear()
                 err_status = re.sub(r'\r?\n', ' ', str(exc))
                 logging.info('spamcheck failed: %s', err_status)
                 retries += 1
@@ -114,7 +113,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                         tests=tests)
             recipients = self.getUniqueRecipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
-            self.session.save(spam)
+            self.session.add(spam)
 
             # Set the error response to be written to the mail log.
             self.error_response = SPAM
@@ -135,7 +134,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             recipients = self.getUniqueRecipients()
             virus.recipients = [VirusRecipient(recipient=x)
                                 for x in recipients]
-            self.session.save(virus)
+            self.session.add(virus)
 
             # Set the error response to be written to the mail log.
             self.error_response = VIRUS

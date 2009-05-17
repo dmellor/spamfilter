@@ -17,7 +17,7 @@ auto_whitelist_table = Table(
     Column('ip', String(15), nullable=False),
     Column('count', Integer, nullable=False),
     Column('totscore', Float(precision='double'), nullable=False),
-    Column('created', TIMESTAMP, PassiveDefault(text('now()'))),
+    Column('created', TIMESTAMP, server_default=text('now()')),
     Column('modified', TIMESTAMP),
     UniqueConstraint('username', 'email', 'ip',
                      name='auto_whitelist_address-index'))

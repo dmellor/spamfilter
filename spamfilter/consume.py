@@ -64,7 +64,7 @@ class SpamConsumer(ConfigMixin):
         g.flatten(message)
         spam = Spam(mail_from=mail_from, ip_address=ips[0], helo=helo,
                     contents=fp.getvalue(), score=0, tests='REPORT')
-        self.session.save(spam)
+        self.session.add(spam)
 
         # Remove the greylist entry.
         query = self.session.query(createGreylistClass())
@@ -89,4 +89,4 @@ class SpamConsumer(ConfigMixin):
             else:
                 record = AutoWhitelist(username='GLOBAL', email=mail_from,
                                        ip=classb, count=1, totscore=1000)
-                self.session.save(record)
+                self.session.add(record)

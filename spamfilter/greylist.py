@@ -89,7 +89,7 @@ class GreylistPolicy(Policy):
         else:
             record.unsuccessful = 1
 
-        self.manager.session.save(record)
+        self.manager.session.add(record)
 
     def isAutoWhitelisted(self, mail_from, ip_address):
         query = self.manager.session.query(AutoWhitelist)

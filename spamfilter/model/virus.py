@@ -15,8 +15,7 @@ viruses_table = Table(
     Column('helo', String(1024), nullable=False),
     Column('contents', TEXT, nullable=False),
     Column('virus', TEXT, nullable=False),
-    Column('created', TIMESTAMP, PassiveDefault(text('now()')),
-           nullable=False))
+    Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
 class VirusRecipient(object):
     def __init__(self, **kws):

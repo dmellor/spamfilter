@@ -11,9 +11,9 @@ greylist_table = Table(
     Column('mail_from', String(1024), nullable=True),
     Column('rcpt_to', String(1024), nullable=False),
     Column('last_instance', String(255), nullable=True),
-    Column('successful', Integer, PassiveDefault('0'), nullable=False),
-    Column('unsuccessful', Integer, PassiveDefault('0'), nullable=False),
-    Column('created', TIMESTAMP, PassiveDefault(text('now()'))),
+    Column('successful', Integer, server_default='0', nullable=False),
+    Column('unsuccessful', Integer, server_default='0', nullable=False),
+    Column('created', TIMESTAMP, server_default=text('now()')),
     Column('modified', TIMESTAMP),
     UniqueConstraint('ip_address', 'mail_from', 'rcpt_to',
                      name='greylist_tuple'))

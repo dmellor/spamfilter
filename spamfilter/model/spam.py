@@ -16,8 +16,7 @@ spam_table = Table(
     Column('contents', TEXT, nullable=False),
     Column('score', Float(precision='double'), nullable=False),
     Column('tests', TEXT, nullable=False),
-    Column('created', TIMESTAMP, PassiveDefault(text('now()')),
-           nullable=False))
+    Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
 class SpamRecipient(object):
     def __init__(self, **kws):
