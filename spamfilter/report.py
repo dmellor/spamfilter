@@ -1,6 +1,6 @@
 import string
 import smtplib
-import md5
+import hashlib
 import random
 import time
 import sys
@@ -176,7 +176,7 @@ class ReportGenerator(ConfigMixin):
 
             i += 1
             msg_date = msg.created.replace(microsecond=0)
-            digest = md5.new()
+            digest = hashlib.md5()
 
             # The MAIL FROM header can be null, if the spam was impersonating a
             # bounce message.
