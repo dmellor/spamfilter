@@ -43,6 +43,7 @@ class GreylistPolicy(Policy):
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
             elif record.accepted or status == ACCEPTED or \
+                self.isWhitelisted(mail_from) or \
                 self.isAutoWhitelisted(mail_from, ip_address):
                 record.last_instance = instance
                 record.successful += 1
@@ -53,7 +54,11 @@ class GreylistPolicy(Policy):
                 return status
 
         # The connection has not been seen before - create a new greylist
-        # record if the status is not a hard rejection.
+        # record if the status is not a hard rejection and the address is not
+        # whitelisted.
+        if self.isWhitelisted(mail_from):
+            status = ACCEPTED
+
         if not status.startswith(HARD_REJECTED):
             self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
                                       status)
@@ -102,3 +107,18 @@ class GreylistPolicy(Policy):
                 return True
 
         return False
+
+    def isWhitelisted(self, mail_from):
+        if not mail_from:
+            return False
+
+        whitelist_db = self.manager.getConfigItem('greylist', 'whitelist_db',
+                                                  None)
+        if not whitelist_db:
+            return False
+
+        if queryPostfixDB(whitelist_db, mail_from):
+            return True
+        else:
+            domain = mail_from[mail_from.index('@') + 1:]
+            return queryPostfixDB(whitelist_db, domain)
