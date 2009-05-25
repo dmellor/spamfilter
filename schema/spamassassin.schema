@@ -165,6 +165,34 @@ CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler
 ALTER FUNCTION public.plpgsql_call_handler() OWNER TO root;
 
 --
+-- Name: spam_tests(integer); Type: FUNCTION; Schema: public; Owner: david
+--
+
+CREATE FUNCTION spam_tests(id integer) RETURNS text
+    AS '
+declare
+    test record;
+    result text;
+begin
+    result := '''';
+    for test in select a.name from tests as a join spam_tests as b
+        on a.id = b.test_id where b.spam_id = id loop
+        result := result || '','' || test.name;
+    end loop;
+
+    if result != '''' then
+       result := substring(result from 2);
+    end if;
+
+    return result;
+end;
+'
+    LANGUAGE plpgsql;
+
+
+ALTER FUNCTION public.spam_tests(id integer) OWNER TO david;
+
+--
 -- Name: stamp(); Type: FUNCTION; Schema: public; Owner: david
 --
 
@@ -310,7 +338,6 @@ CREATE TABLE spam (
     helo character varying(1024) NOT NULL,
     contents text NOT NULL,
     score double precision NOT NULL,
-    tests text NOT NULL,
     created timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -343,6 +370,31 @@ CREATE SEQUENCE spam_recipients_id_seq
 
 
 ALTER TABLE public.spam_recipients_id_seq OWNER TO david;
+
+--
+-- Name: spam_tests; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE spam_tests (
+    spam_id integer NOT NULL,
+    test_id integer NOT NULL
+);
+
+
+ALTER TABLE public.spam_tests OWNER TO david;
+
+--
+-- Name: tests; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE tests (
+    id serial NOT NULL,
+    name character varying(255) NOT NULL,
+    description text NOT NULL
+);
+
+
+ALTER TABLE public.tests OWNER TO david;
 
 --
 -- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
@@ -470,6 +522,14 @@ ALTER TABLE ONLY spam_recipients
 
 
 --
+-- Name: tests_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY tests
+    ADD CONSTRAINT tests_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: virus_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -528,6 +588,13 @@ CREATE INDEX spam_ip_address ON spam USING btree (ip_address);
 
 
 --
+-- Name: tests_name_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE UNIQUE INDEX tests_name_index ON tests USING btree (name);
+
+
+--
 -- Name: auto_whitelist_stamp; Type: TRIGGER; Schema: public; Owner: david
 --
 
@@ -563,6 +630,22 @@ CREATE TRIGGER quarantine_recipients_regexp
 
 ALTER TABLE ONLY spam_recipients
     ADD CONSTRAINT spam_recipients_fkey FOREIGN KEY (spam_id) REFERENCES spam(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spam_tests_spam_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY spam_tests
+    ADD CONSTRAINT spam_tests_spam_id_fkey FOREIGN KEY (spam_id) REFERENCES spam(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spam_tests_test_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY spam_tests
+    ADD CONSTRAINT spam_tests_test_id_fkey FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE RESTRICT;
 
 
 --
@@ -681,6 +764,36 @@ REVOKE ALL ON TABLE spam_recipients_id_seq FROM PUBLIC;
 REVOKE ALL ON TABLE spam_recipients_id_seq FROM david;
 GRANT ALL ON TABLE spam_recipients_id_seq TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients_id_seq TO qmail;
+
+
+--
+-- Name: spam_tests; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam_tests FROM PUBLIC;
+REVOKE ALL ON TABLE spam_tests FROM david;
+GRANT ALL ON TABLE spam_tests TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests TO qmail;
+
+
+--
+-- Name: tests; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE tests FROM PUBLIC;
+REVOKE ALL ON TABLE tests FROM david;
+GRANT ALL ON TABLE tests TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE tests TO qmail;
+
+
+--
+-- Name: tests_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE tests_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE tests_id_seq FROM david;
+GRANT ALL ON TABLE tests_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE tests_id_seq TO qmail;
 
 
 --

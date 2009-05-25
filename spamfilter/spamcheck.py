@@ -1,3 +1,4 @@
+import os
 from subprocess import *
 import socket
 import re
@@ -6,7 +7,7 @@ import logging
 
 from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
-from spamfilter.model.spam import Spam, SpamRecipient
+from spamfilter.model.spam import Spam, SpamRecipient, SpamTest
 from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.greylist import createGreylistClass
 
@@ -110,7 +111,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # quarantined.
             spam = Spam(mail_from=self.mail_from, ip_address=self.remote_addr,
                         helo=self.remote_host, contents=message, score=score,
-                        tests=tests)
+                        tests=determineSpamTests(self.session, tests))
             recipients = self.getUniqueRecipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.add(spam)
@@ -188,7 +189,7 @@ def checkSpamassassin(message, max_len, host=None):
             if match:
                 tests.append(match.group(1))
 
-    return False, score, ','.join(tests)
+    return False, score, tests
 
 def checkClamav(message, host, port, timeout):
     timeout = float(timeout)
@@ -213,3 +214,46 @@ def checkClamav(message, host, port, timeout):
     response = s.recv(1024)
     match = re.search(r'(\S+)\s+FOUND$', response)
     return match.group(1) if match else None
+
+def determineSpamTests(session, tests):
+    spam_tests = dict([(x, None) for x in tests])
+    query = session.query(SpamTest)
+    new_tests = dict()
+    for test in tests:
+        spam_test = query.filter_by(name=test).first()
+        if spam_test:
+            spam_tests[test] = spam_test
+        else:
+            new_tests[test] = None
+
+    _createNewTests(new_tests)
+    for name, test in new_tests.items():
+        if test:
+            spam_tests[name] = test
+
+    return [x for x in spam_tests.values() if x]
+
+def _createNewTests(new_tests):
+    num_tests = len(new_tests)
+    file_paths = []
+    for root, dirs, files in os.walk('/usr/share/spamassassin'):
+        for file in files:
+            if file.endswith('.cf'):
+                file_paths.append(os.path.join(root, file))
+
+    pattern = re.compile(r'^\s*describe\s+(\S+)\s+(.*)')
+    for file_path in file_paths:
+        f = open(file_path)
+        for line in f:
+            match = pattern.search(line)
+            if match:
+                name, description = match.groups()
+                if name in new_tests:
+                    test = SpamTest(name=name, description=description)
+                    new_tests[name] = test
+                    num_tests -= 1
+                    if num_tests == 0:
+                        f.close()
+                        return
+
+        f.close()

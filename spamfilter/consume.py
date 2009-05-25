@@ -63,7 +63,7 @@ class SpamConsumer(ConfigMixin):
         g = Generator(fp, mangle_from_=False)
         g.flatten(message)
         spam = Spam(mail_from=mail_from, ip_address=ips[0], helo=helo,
-                    contents=fp.getvalue(), score=0, tests='REPORT')
+                    contents=fp.getvalue(), score=0)
         self.session.add(spam)
 
         # Remove the greylist entry.
