@@ -3,10 +3,16 @@
 umask 002
 directory=${0%/*}
 cd $directory
+if [ -z "$1" ]; then
+    config=config.ini
+else
+    config="$1"
+fi
+
 . bin/activate
 exec python -c '
 import sys
 sys.argv[0] = "consume"
 from spamfilter.consume import SpamConsumer
 SpamConsumer(config=sys.argv[1]).process()
-sys.exit(0)' config.ini
+sys.exit(0)' "$config"

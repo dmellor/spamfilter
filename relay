@@ -3,10 +3,18 @@
 umask 002
 directory=${0%/*}
 cd $directory
+if [ -z "$2" ]; then
+    config=config.ini
+    host="$1"
+else
+    config="$1"
+    host="$2"
+fi
+
 . bin/activate
 exec python -c '
 import sys
 sys.argv[0] = "relay"
 from spamfilter.relay import Relay
 Relay(config=sys.argv[1], host=sys.argv[2]).processMessage()
-sys.exit(0)' config.ini $1
+sys.exit(0)' "$config" "$host"
