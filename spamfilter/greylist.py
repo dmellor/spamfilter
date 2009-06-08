@@ -1,5 +1,6 @@
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.model.auto_whitelist import AutoWhitelist
+from spamfilter.model.sentmail import SentMail
 from spamfilter.policy import Policy, ACCEPTED
 from spamfilter.mixin import queryPostfixDB
 
@@ -44,7 +45,8 @@ class GreylistPolicy(Policy):
                 return ACCEPTED
             elif record.accepted or status == ACCEPTED or \
                 self.isWhitelisted(mail_from) or \
-                self.isAutoWhitelisted(mail_from, ip_address):
+                self.isAutoWhitelisted(mail_from, ip_address) or \
+                self.isKnownCorrespondent(mail_from, rcpt_to):
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
@@ -122,3 +124,7 @@ class GreylistPolicy(Policy):
         else:
             domain = mail_from[mail_from.index('@') + 1:]
             return queryPostfixDB(whitelist_db, domain)
+
+    def isKnownCorrespondent(self, mail_from, recipient):
+        query = self.manager.session.query(SentMail)
+        return query.filter_by(sender=recipient, recipient=mail_from).count()

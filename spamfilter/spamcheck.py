@@ -10,6 +10,7 @@ from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient, SpamTest
 from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.sentmail import SentMail
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 VIRUS = '250 Message contains a virus and has been quarantined'
@@ -27,14 +28,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         self.session = createSession(self.getConfigItem('database', 'dburi'))
         Greylist = createGreylistClass(
             self.getConfigItem('greylist', 'interval', 30))
+        self.trusted_ips = self.getConfigItemList('sent_mail', 'trusted_ips')
+        self.pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
 
     def checkMessage(self, message):
-        # If the remote address is in the POP before SMTP table, then we do not
-        # want to perform any checks.
-        pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
-        if pop_db and queryPostfixDB(pop_db, self.remote_addr):
-            return True
-
         # If the sender is whitelisted then we do not want to perform any
         # checks. This is to prevent quarantining mail that SpamAssassin
         # consistently and incorrectly flags as spam.
@@ -80,6 +77,11 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         return ok
 
     def performChecks(self, message):
+        # If the message if being sent from this host, then do not perform any
+        # checks.
+        if self.isSentMail():
+            return True
+
         # If the message is above a certain size, then automatically accept it.
         max_len = int(self.getConfigItem('spamfilter', 'max_message_length'))
         if len(message) > max_len:
@@ -149,6 +151,28 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             recips[recip] = 1
         
         return recips.keys()
+
+    def isSentMail(self):
+        # If the remote IP address is a trusted IP address or is in the POP
+        # before SMTP table, then we do not want to perform any checks as this
+        # is mail that is being sent from this host.
+        is_sent_mail = self.remote_addr in self.trusted_ips
+        if not is_sent_mail and self.pop_db:
+            is_sent_mail = queryPostfixDB(self.pop_db, self.remote_addr)
+
+        if is_sent_mail and self.mail_from:
+            query = self.session.query(SentMail).filter_by(
+                sender=self.mail_from)
+            recipients = self.getUniqueRecipients()
+            for recipient in recipients:
+                record = query.filter_by(recipient=recipient).first()
+                if record:
+                    record.messages += 1
+                else:
+                    self.session.add(SentMail(sender=self.mail_from,
+                                              recipient=recipient))
+
+        return is_sent_mail
 
 def checkSpamassassin(message, max_len, host=None):
     command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]

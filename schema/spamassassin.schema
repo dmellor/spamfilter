@@ -315,6 +315,22 @@ CREATE SEQUENCE quarantine_recipients_id_seq
 ALTER TABLE public.quarantine_recipients_id_seq OWNER TO david;
 
 --
+-- Name: sent_mail; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE sent_mail (
+    id serial NOT NULL,
+    sender character varying(255) NOT NULL,
+    recipient character varying(255) NOT NULL,
+    messages integer NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    modified timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE public.sent_mail OWNER TO david;
+
+--
 -- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -506,6 +522,14 @@ ALTER TABLE ONLY quarantine_recipients
 
 
 --
+-- Name: sent_mail_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY sent_mail
+    ADD CONSTRAINT sent_mail_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: spam_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -574,6 +598,13 @@ CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (ip_address, mail_fro
 
 
 --
+-- Name: sent_mail_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE UNIQUE INDEX sent_mail_index ON sent_mail USING btree (sender, recipient);
+
+
+--
 -- Name: spam_helo; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -622,6 +653,16 @@ CREATE TRIGGER quarantine_recipients_regexp
     BEFORE INSERT OR UPDATE ON quarantine_recipients
     FOR EACH ROW
     EXECUTE PROCEDURE convert_original();
+
+
+--
+-- Name: sent_mail_stamp; Type: TRIGGER; Schema: public; Owner: david
+--
+
+CREATE TRIGGER sent_mail_stamp
+    BEFORE INSERT OR UPDATE ON sent_mail
+    FOR EACH ROW
+    EXECUTE PROCEDURE stamp();
 
 
 --
@@ -724,6 +765,26 @@ REVOKE ALL ON TABLE quarantine_recipients FROM PUBLIC;
 REVOKE ALL ON TABLE quarantine_recipients FROM david;
 GRANT ALL ON TABLE quarantine_recipients TO david;
 GRANT SELECT ON TABLE quarantine_recipients TO qmail;
+
+
+--
+-- Name: sent_mail; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE sent_mail FROM PUBLIC;
+REVOKE ALL ON TABLE sent_mail FROM david;
+GRANT ALL ON TABLE sent_mail TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE sent_mail TO qmail;
+
+
+--
+-- Name: sent_mail_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE sent_mail_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE sent_mail_id_seq FROM david;
+GRANT ALL ON TABLE sent_mail_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE sent_mail_id_seq TO qmail;
 
 
 --

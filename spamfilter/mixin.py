@@ -14,6 +14,13 @@ class ConfigMixin(object):
             else:
                 raise
 
+    def getConfigItemList(self, section, name):
+        item = self.getConfigItem(section, name, [])
+        if type(item) is str:
+            item = [x.strip() for x in item.split(',')]
+
+        return item
+
 Session = None
 
 def createSession(dburi):
