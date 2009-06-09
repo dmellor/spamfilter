@@ -43,10 +43,10 @@ class GreylistPolicy(Policy):
                 # done here. This requires that the blacklist policy appear
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
-            elif record.accepted or status == ACCEPTED or \
-                self.isWhitelisted(mail_from) or \
-                self.isAutoWhitelisted(mail_from, ip_address) or \
-                self.isKnownCorrespondent(mail_from, rcpt_to):
+            elif (record.accepted or status == ACCEPTED or
+                self.isWhitelisted(mail_from) or
+                self.isAutoWhitelisted(mail_from, ip_address) or
+                self.isKnownCorrespondent(mail_from, rcpt_to)):
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
