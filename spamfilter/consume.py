@@ -4,7 +4,7 @@ from cStringIO import StringIO
 from email.generator import Generator
 from email.utils import parseaddr
 from spamfilter.model.spam import Spam
-from spamfilter.model.auto_whitelist import AutoWhitelist
+from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.mixin import *
 
