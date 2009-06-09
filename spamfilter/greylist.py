@@ -44,9 +44,7 @@ class GreylistPolicy(Policy):
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
             elif (record.accepted or status == ACCEPTED or
-                self.isWhitelisted(mail_from) or
-                self.isAutoWhitelisted(mail_from, ip_address) or
-                self.isKnownCorrespondent(mail_from, rcpt_to)):
+                  self.isAccepted(mail_from, rcpt_to, ip_address)):
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
@@ -58,7 +56,7 @@ class GreylistPolicy(Policy):
         # The connection has not been seen before - create a new greylist
         # record if the status is not a hard rejection and the address is not
         # whitelisted.
-        if self.isWhitelisted(mail_from):
+        if self.isAccepted(mail_from, rcpt_to, ip_address):
             status = ACCEPTED
 
         if not status.startswith(HARD_REJECTED):
@@ -128,3 +126,8 @@ class GreylistPolicy(Policy):
     def isKnownCorrespondent(self, mail_from, recipient):
         query = self.manager.session.query(SentMail)
         return query.filter_by(sender=recipient, recipient=mail_from).count()
+
+    def isAccepted(self, mail_from, rcpt_to, ip_address):
+        return (self.isWhitelisted(mail_from) or
+                self.isAutoWhitelisted(mail_from, ip_address) or
+                self.isKnownCorrespondent(mail_from, rcpt_to))
