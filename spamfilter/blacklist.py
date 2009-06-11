@@ -11,6 +11,10 @@ SOFT_CLASSC_REJECTED = \
 HARD_CLASSC_REJECTED = \
     'reject Spam has recently been received from your network'
 
+OK = 0
+SOFT = 1
+HARD = 2
+
 class BlacklistPolicy(GreylistPolicy):
     def __init__(self, manager):
         super(BlacklistPolicy, self).__init__(manager)
@@ -28,6 +32,9 @@ class BlacklistPolicy(GreylistPolicy):
             self.manager.getConfigItem('blacklist', 'interval', 720))
 
     def processRequest(self):
+        rcpt_to, mail_from, ip_address = self.getGreylistTuple()
+
+        # First test - check if the IP address or host name is blacklisted.
         ip_num, helo_num = self.getBlacklistThresholds()
         if ip_num >= helo_num:
             num = ip_num
@@ -36,25 +43,40 @@ class BlacklistPolicy(GreylistPolicy):
             num = helo_num
             parameter = self.manager.get('helo_name')
 
-        rcpt_to, mail_from, ip_address = self.getGreylistTuple()
         if num >= self.hard_threshold:
-            return self.greylist(rcpt_to, mail_from, ip_address,
-                                 HARD_REJECTED % parameter)
+            status1 = HARD_REJECTED % parameter
+            level1 = HARD
         elif num >= self.soft_threshold:
-            return self.greylist(rcpt_to, mail_from, ip_address,
-                                 SOFT_REJECTED % parameter)
+            status1 = SOFT_REJECTED % parameter
+            level1 = SOFT
+        else:
+            status1 = ACCEPTED
+            level1 = OK
 
+        # Second test - check if the class C network is blacklisted.
+        status2 = ACCEPTED
+        level2 = OK
         classc_count, distinct_count = self.getClasscSpamCount(ip_address)
         if distinct_count > 1:
             if classc_count >= self.hard_classc_threshold:
-                return self.greylist(rcpt_to, mail_from, ip_address,
-                                     HARD_CLASSC_REJECTED)
+                status2 = HARD_CLASSC_REJECTED
+                level2 = HARD
             elif classc_count >= self.soft_classc_threshold:
-                return self.greylist(rcpt_to, mail_from, ip_address,
-                                     SOFT_CLASSC_REJECTED)
+                status2 = SOFT_CLASSC_REJECTED
+                level2 = SOFT
 
-        # If execution reaches this point then the message is not blacklisted.
-        return ACCEPTED
+        # Determine the most restrictive level.
+        if level1 >= level2:
+            status = status1
+            level = level1
+        else:
+            status = status2
+            level = level2
+
+        if level != OK:
+            return self.greylist(rcpt_to, mail_from, ip_address, status)
+        else:
+            return ACCEPTED
 
     def getBlacklistThresholds(self):
         query = self.manager.session.query(Spam)
