@@ -7,9 +7,9 @@ from sqlalchemy.sql import select, func
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
 HARD_REJECTED = 'reject Spam has recently been received from %s'
 SOFT_CLASSC_REJECTED = \
-    'defer_if_permit Spam has recently been received from your network'
+    'defer_if_permit Spam has recently been received from the %s network'
 HARD_CLASSC_REJECTED = \
-    'reject Spam has recently been received from your network'
+    'reject Spam has recently been received from the %s network'
 
 OK = 0
 SOFT = 1
@@ -59,10 +59,10 @@ class BlacklistPolicy(GreylistPolicy):
         classc_count, distinct_count = self.getClasscSpamCount(ip_address)
         if distinct_count > 1:
             if classc_count >= self.hard_classc_threshold:
-                status2 = HARD_CLASSC_REJECTED
+                status2 = HARD_CLASSC_REJECTED % getNetworkBlock(ip_address)
                 level2 = HARD
             elif classc_count >= self.soft_classc_threshold:
-                status2 = SOFT_CLASSC_REJECTED
+                status2 = SOFT_CLASSC_REJECTED % getNetworkBlock(ip_address)
                 level2 = SOFT
 
         # Determine the most restrictive level.
@@ -94,3 +94,8 @@ class BlacklistPolicy(GreylistPolicy):
             spam_table.c.ip_address.like(classc))
         connection = self.manager.session.connection()
         return connection.execute(query).fetchone()
+
+def getNetworkBlock(ip_address):
+    octets = ip_address.split('.')[:3]
+    octets.append('0')
+    return '%s/24' % '.'.join(octets)
