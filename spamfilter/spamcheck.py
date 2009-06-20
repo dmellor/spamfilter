@@ -201,7 +201,8 @@ def checkSpamassassin(message, max_len, host=None):
 
     # The message is spam. We extract the tests from the rest of the output
     # from spamc.
-    pattern = re.compile(r'^\s*-?[\d\.]+\s+(\S+)')
+    pattern = re.compile(r'^\s*-?[\d\.]+\s+(\S+)\s+(.*)')
+    continuation = re.compile(r'^\s*\b(.*)')
     tests = []
     seen = False
     for line in output:
@@ -211,7 +212,15 @@ def checkSpamassassin(message, max_len, host=None):
         elif seen:
             match = pattern.search(line)
             if match:
-                tests.append(match.group(1))
+                tests.append(match.group(1, 2))
+                continue
+
+            if tests:
+                match = continuation.search(line)
+                if match:
+                    test, description = tests[-1]
+                    description += ' ' + match.group(1).strip()
+                    tests[-1] = (test, description)
 
     return False, score, tests
 
@@ -240,44 +249,29 @@ def checkClamav(message, host, port, timeout):
     return match.group(1) if match else None
 
 def determineSpamTests(session, tests):
-    spam_tests = dict([(x, None) for x in tests])
+    tests, descriptions = zip(*tests)
+    spam_tests = []
     query = session.query(SpamTest)
-    new_tests = dict()
-    for test in tests:
-        spam_test = query.filter_by(name=test).first()
+    for i in range(len(tests)):
+        # Some of the more esoteric SpamAssassin tests do not have a
+        # description, in which case spamc will report the description as being
+        # equal to the test name. For such tests we create a SpamTest object
+        # with the description set to null if the test is a new test. If an
+        # existing test does not have a description but spamc now reports a
+        # description for it then we update the existing test.
+        spam_test = query.filter_by(name=tests[i]).first()
         if spam_test:
-            spam_tests[test] = spam_test
+            if (spam_test.description is None and
+                tests[i] != descriptions[i]):
+                spam_test.description = descriptions[i]
+
+            spam_tests.append(spam_test)
         else:
-            new_tests[test] = None
+            if tests[i] != descriptions[i]:
+                test = SpamTest(name=tests[i], description=descriptions[i])
+            else:
+                test = SpamTest(name=tests[i])
 
-    _createNewTests(new_tests)
-    for name, test in new_tests.items():
-        if test:
-            spam_tests[name] = test
+            spam_tests.append(test)
 
-    return [x for x in spam_tests.values() if x]
-
-def _createNewTests(new_tests):
-    num_tests = len(new_tests)
-    file_paths = []
-    for root, dirs, files in os.walk('/usr/share/spamassassin'):
-        for file in files:
-            if file.endswith('.cf'):
-                file_paths.append(os.path.join(root, file))
-
-    pattern = re.compile(r'^\s*describe\s+(\S+)\s+(.*)')
-    for file_path in file_paths:
-        f = open(file_path)
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                name, description = match.groups()
-                if name in new_tests:
-                    test = SpamTest(name=name, description=description)
-                    new_tests[name] = test
-                    num_tests -= 1
-                    if num_tests == 0:
-                        f.close()
-                        return
-
-        f.close()
+    return spam_tests

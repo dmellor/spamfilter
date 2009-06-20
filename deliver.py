@@ -84,7 +84,8 @@ def _confirm(url, spam):
     print '<br><br>This message has been quarantined for the following reasons'
     print '<ul>'
     for test in spam.tests:
-        print '<li>%s</li>' % test.description
+        if test.description:
+            print '<li>%s</li>' % test.description
 
     print '</ul></font>'
     print '<h2>Click the button to deliver the message to your mailbox.</h2>'
