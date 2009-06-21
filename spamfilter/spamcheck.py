@@ -249,28 +249,28 @@ def checkClamav(message, host, port, timeout):
     return match.group(1) if match else None
 
 def determineSpamTests(session, tests):
-    tests, descriptions = zip(*tests)
+    names, descriptions = zip(*tests)
     spam_tests = []
     query = session.query(SpamTest)
-    for i in range(len(tests)):
+    for i in range(len(names)):
         # Some of the more esoteric SpamAssassin tests do not have a
         # description, in which case spamc will report the description as being
         # equal to the test name. For such tests we create a SpamTest object
         # with the description set to null if the test is a new test. If an
         # existing test does not have a description but spamc now reports a
         # description for it then we update the existing test.
-        spam_test = query.filter_by(name=tests[i]).first()
+        spam_test = query.filter_by(name=names[i]).first()
         if spam_test:
             if (spam_test.description is None and
-                tests[i] != descriptions[i]):
+                names[i] != descriptions[i]):
                 spam_test.description = descriptions[i]
 
             spam_tests.append(spam_test)
         else:
-            if tests[i] != descriptions[i]:
-                test = SpamTest(name=tests[i], description=descriptions[i])
+            if names[i] != descriptions[i]:
+                test = SpamTest(name=names[i], description=descriptions[i])
             else:
-                test = SpamTest(name=tests[i])
+                test = SpamTest(name=names[i])
 
             spam_tests.append(test)
 
