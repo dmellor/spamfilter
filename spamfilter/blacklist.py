@@ -97,5 +97,4 @@ class BlacklistPolicy(GreylistPolicy):
 
 def getNetworkBlock(ip_address):
     octets = ip_address.split('.')[:3]
-    octets.append('0')
-    return '%s/24' % '.'.join(octets)
+    return '%s.0/24' % '.'.join(octets)
