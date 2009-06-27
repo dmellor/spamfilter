@@ -27,7 +27,9 @@ virus_recipients_table = Table(
     Column('id', Integer, Sequence('virus_recipients_id_seq'),
            primary_key=True),
     Column('recipient', String(1024), nullable=False),
-    Column('virus_id', Integer, ForeignKey('viruses.id'), nullable=False))
+    Column('virus_id', Integer, ForeignKey('viruses.id'), nullable=False),
+    Column('delivery_id', String(32)),
+    UniqueConstraint('delivery_id'))
 
 mapper(VirusRecipient, virus_recipients_table)
 

@@ -419,7 +419,8 @@ ALTER TABLE public.tests OWNER TO david;
 CREATE TABLE virus_recipients (
     id integer DEFAULT nextval(('virus_recipients_id_seq'::text)::regclass) NOT NULL,
     recipient character varying(1024) NOT NULL,
-    virus_id integer NOT NULL
+    virus_id integer NOT NULL,
+    delivery_id character varying(32)
 );
 
 
@@ -619,10 +620,24 @@ CREATE INDEX spam_ip_address ON spam USING btree (ip_address);
 
 
 --
+-- Name: spam_recipients_delivery_id; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE UNIQUE INDEX spam_recipients_delivery_id ON spam_recipients USING btree (delivery_id);
+
+
+--
 -- Name: tests_name_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE UNIQUE INDEX tests_name_index ON tests USING btree (name);
+
+
+--
+-- Name: virus_recipients_delivery_id; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE UNIQUE INDEX virus_recipients_delivery_id ON virus_recipients USING btree (delivery_id);
 
 
 --
