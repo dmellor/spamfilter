@@ -1,0 +1,140 @@
+From: <do_not_reply@${domain}>
+To: ${recipient}
+Date: ${rfcdate}
+Subject: Spam quarantine summary ${subject_date}
+Content-Type: text/html; charset=utf8
+Content-Transfer-Encoding: 8bit
+
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<body bgcolor="#FFFFFF">
+<font face="Arial, Helvetica, sans-serif" size="-1">${recipient}</font>
+<p>
+
+% if spam:
+<font face="Arial, Helvetica, sans-serif" size="-1">
+<b>Spam Email Blocked by the ${server_name} Mail Server</b><p>
+Clicking on the "deliver" links below will cause the corresponding
+quarantined message to be delivered to your mailbox.
+<b>Spam is automatically purged from your quarantine queue after 14 days,
+freeing you from having to do it manually.</b><p>
+</font>
+<br>
+<table width="100%" cellspacing="0" cellpadding="1" border="0">
+<tr bgcolor="#FFFFFF">
+<td width="30%">
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#666666">
+<b>Junk Messages</b>
+</font>
+</td>
+<td width="40%">
+<font face="Arial, Helvetica, sans-serif" size="-2">
+${len(spam)} ${'Messages' if len(spam) > 1 else 'Message'}
+</font>
+</td>
+<td width="20%">
+&nbsp;</td>
+<td>&nbsp;</td></tr>
+<tr bgcolor="#666666">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>From</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Subject</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Date</b></font></td><td>&nbsp;</td></tr>
+
+<% i = 0 %>
+% for msg in spam:
+<%
+colour = '#FFFFFF' if i & 1 else '#EEEEEE'
+i += 1
+%>
+<tr bgcolor="${colour}">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.mail_from}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.subject}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.date}</font>
+</td>
+<td><font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<a href="http://${host}/cgi-bin/deliver/${msg.delivery_id}">Deliver</a>
+</font></td>
+</tr>
+% endfor
+
+</table>
+<br><br>
+% endif
+
+% if viruses:
+<font face="Arial, Helvetica, sans-serif" size="-1">
+<b>Viruses Blocked by the ${server_name} Mail Server</b><p>
+If you wish to recieve any of these messages, please contact
+dmellor@whistlingcat.com.</b><p>
+</font>
+<br>
+<table width="100%" cellspacing="0" cellpadding="1" border="0">
+<tr bgcolor="#FFFFFF">
+<td width="30%">
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FF0000">
+<b>Viruses</b>
+</font>
+</td>
+<td width="40%">
+<font face="Arial, Helvetica, sans-serif" size="-2">
+${len(viruses)} ${'Viruses' if len(viruses) > 1 else 'Virus'}
+</font>
+</td>
+<td width="20%">
+&nbsp;</td>
+<td>&nbsp;</td></tr>
+<tr bgcolor="#FF0000">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>From</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Subject</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Date</b></font></td><td>&nbsp;</td></tr>
+
+<% i = 0 %>
+% for msg in viruses:
+<%
+colour = '#FFFFFF' if i & 1 else '#FFEEEE'
+i += 1
+%>
+<tr bgcolor="${colour}">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.mail_from}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.subject}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.date}</font>
+</td>
+</tr>
+% endfor
+
+</table>
+<br><br>
+% endif
+
+</body>
+</html>

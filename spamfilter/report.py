@@ -1,9 +1,8 @@
-import string
+import os
 import smtplib
 import hashlib
 import random
 import time
-import sys
 import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 from sqlalchemy import select, text
@@ -12,89 +11,21 @@ from email.header import decode_header
 
 from spamfilter.mixin import ConfigMixin, createSession
 from spamfilter.model.spam import Spam, SpamRecipient, spam_recipients_table
+from spamfilter.model.virus import Virus, VirusRecipient, virus_recipients_table
+from mako.template import Template
 
-HEADERS = '''From: <do_not_reply@${domain}>
-To: $recipient
-Date: $rfcdate
-Subject: Spam quarantine summary $subject_date
-Content-Type: text/html; charset=utf8
-Content-Transfer-Encoding: 8bit
-
-'''
-
-PREAMBLE = '''<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
-<html>
-<body bgcolor="#FFFFFF">
-<table width="100%" cellspacing="0" cellpadding="1" border="0">
-<tr><td>
-<font face="Arial, Helvetica, sans-serif" size="-1">
-$recipient
-<p>
-<B>Spam Email Blocked by the $server_name Mail Server</B><P>
-Clicking on the "deliver" links below will cause the corresponding
-quarantined message to be delivered to your mailbox.
-<B>Spam is automatically purged from your quarantine queue after 14 days,
-freeing you from having to do it manually.</B><p>
-</font></td></tr></table>
-<br><br>
-<table width="100%" cellspacing="0" cellpadding="1" border="0">
-<tr bgcolor="#FFFFFF">
-<td width="30%">
-<font face="Arial, Helvetica, sans-serif" size="-1" color="#666666">
-<b>Junk Messages</b>
-</font>
-</td>
-<td width="40%">
-<font face="Arial, Helvetica, sans-serif" size="-2">
-$num_messages
-</font>
-</td>
-<td width="20%">
-&nbsp;</td>
-<td>&nbsp;</td></tr>
-<tr bgcolor="#666666">
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
-<b>From</b>
-</font>
-</td>
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
-<b>Subject</b>
-</font>
-</td>
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
-<b>Date</b></font></td><td>&nbsp;</td></tr>
-'''
-
-ROW_TEXT = '''<tr bgcolor="${colour}">
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1">$mail_from</font>
-</td>
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1">$subject</font>
-</td>
-<td>
-<font face="Arial, Helvetica, sans-serif" size="-1">$msg_date</font>
-</td>
-<td><font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
-<a href="http://${host}/cgi-bin/deliver/${delivery_id}">Deliver</a>
-</font></td>
-</tr>
-'''
-
-SUFFIX = '''</table>
-<br><br>
-</font>
-</body>
-</html>
-'''
+class MessageSummary(object):
+    def __init__(self, **kws):
+        for k, v in kws.items():
+            setattr(self, k, v)
 
 class ReportGenerator(ConfigMixin):
     def __init__(self, config):
         self.readConfig(config)
         self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.template = Template(
+            filename=os.path.join(os.path.dirname(__file__), 'report.txt'),
+            input_encoding='utf-8', output_encoding='utf-8')
         
     def report(self):
         # Retrieve the addresses to which a quarantine message should be sent.
@@ -104,14 +35,23 @@ class ReportGenerator(ConfigMixin):
         query = query.group_by(spam_recipients_table.c.recipient)
         recipients = [x[0] for x in connection.execute(query)]
 
+        # Add in any recipients who only received viruses.
+        query = select([virus_recipients_table.c.recipient])
+        query = query.where(virus_recipients_table.c.delivery_id == None)
+        query = query.group_by(virus_recipients_table.c.recipient)
+        virus_recipients = [x[0] for x in connection.execute(query)]
+        for recipient in virus_recipients:
+            if recipient not in recipients:
+                recipients.append(recipient)
+
         # Send a quarantine report to each recipient. Each report is generated
-        # and sent out within a single database transaction, and we make five
+        # and sent out within a single database transaction, and we make two
         # attempts per user to send the report before giving up.
         host = self.getConfigItem('report', 'host')
         random.seed()
         for recipient in recipients:
             attempt = 0
-            while attempt < 5:
+            while attempt < 2:
                 try:
                     self.sendQuarantineReport(recipient, host)
                     self.session.commit()
@@ -119,7 +59,7 @@ class ReportGenerator(ConfigMixin):
                 except Exception, exc:
                     self.session.rollback()
                     attempt += 1
-                    if attempt == 5:
+                    if attempt == 2:
                         print "Unable to send report to %s: %s" % \
                               (recipient, exc)
                     time.sleep(5)
@@ -132,14 +72,15 @@ class ReportGenerator(ConfigMixin):
         result = connection.execute(query, x=recipient).fetchone()
         actual_recipient = result[0] if result else recipient
 
-        # Retrieve the spam recipient records for this recipient.
+        # Create the message summaries for this recipient's spam and viruses.
         query = self.session.query(SpamRecipient)
         query = query.filter_by(recipient=recipient, delivery_id=None)
-        records = query.all()
-
-        # Retrieve the spam, sorting it by creation date.
-        spam = [x.spam for x in records]
-        spam.sort(key=lambda x: x.created)
+        spam = createMessageSummaries([x.spam for x in query.all()],
+                                      recipient)
+        query = self.session.query(VirusRecipient)
+        query = query.filter_by(recipient=recipient, delivery_id=None)
+        viruses = createMessageSummaries([x.virus for x in query.all()],
+                                         recipient)
 
         # Extract the domain name from the recipient and determine the name of
         # the mail server.
@@ -148,66 +89,48 @@ class ReportGenerator(ConfigMixin):
         result = connection.execute(query, x=domain).fetchone()
         server_name = result[0] if result else domain
 
-        # Construct the message.
-        headers_template = string.Template(HEADERS)
+        # Construct and send the report.
         cur_date = mx.DateTime.now()
-        msg_text = [headers_template.substitute(
-            recipient=recipient,
-            rfcdate=rfc822str(cur_date),
-            domain=domain,
-            subject_date=cur_date.strftime("%m/%d/%Y %I:%M %p"))]
-        preamble_template = string.Template(PREAMBLE)
-        if len(spam) == 1:
-            num_messages = '1 Message'
-        else:
-            num_messages = '%s Messages' % len(spam)
-
-        msg_text.append(
-            preamble_template.substitute(recipient=recipient,
-                                         num_messages=num_messages,
-                                         server_name=server_name))
-        row_template = string.Template(ROW_TEXT)
-        i = 0
-        for msg in spam:
-            if i & 1 == 0:
-                colour = "#FFFFFF"
-            else:
-                colour = "#EEEEEE"
-
-            i += 1
-            msg_date = msg.created.replace(microsecond=0)
-            digest = hashlib.md5()
-
-            # The MAIL FROM header can be null, if the spam was impersonating a
-            # bounce message.
-            if msg.mail_from:
-                digest.update(msg.mail_from)
-
-            # The subject can be null in some incorrectly formatted Asian spam.
-            if msg.subject:
-                digest.update(msg.subject)
-
-            digest.update(str(msg_date))
-            digest.update(str(random.random()))
-            delivery_id = digest.hexdigest()
-            msg_text.append(
-                row_template.substitute(
-                    mail_from=msg.mail_from, subject=translate(msg.subject),
-                    msg_date=msg_date, delivery_id=delivery_id, colour=colour,
-                    host=host))
-            for spam_recipient in msg.recipients:
-                if spam_recipient.recipient == recipient:
-                    spam_recipient.delivery_id = delivery_id
-                    break
-
-        msg_text.append(SUFFIX)
-
-        # Deliver the message.
+        msg_text = self.template.render(
+            domain=domain, host=host, server_name=server_name,
+            recipient=recipient, rfcdate=rfc822str(cur_date),
+            subject_date=cur_date.strftime("%m/%d/%Y %I:%M %p"), spam=spam,
+            viruses=viruses)
         mailServer = smtplib.SMTP('localhost')
         sender = 'do_not_reply@%s' % domain
-        mailServer.sendmail(sender, actual_recipient, ''.join(msg_text),
+        mailServer.sendmail(sender, actual_recipient, msg_text,
                             ['BODY=8BITMIME'])
         mailServer.quit()
+
+def createMessageSummaries(messages, recipient):
+    # Order the messages by date, and then create a summary of each message.
+    messages.sort(key=lambda x: x.created)
+    return [MessageSummary(mail_from=x.mail_from, subject=translate(x.subject),
+                           date=x.created.replace(microsecond=0),
+                           delivery_id=createDeliveryId(x, recipient))
+            for x in messages]
+
+def createDeliveryId(message, recipient):
+    digest = hashlib.md5()
+
+    # The MAIL FROM header can be null, if the spam was impersonating a bounce
+    # message.
+    if message.mail_from:
+        digest.update(message.mail_from)
+
+    # The subject can be null in some incorrectly formatted Asian spam.
+    if message.subject:
+        digest.update(message.subject)
+
+    digest.update(str(message.created))
+    digest.update(str(random.random()))
+    delivery_id = digest.hexdigest()
+    for message_recipient in message.recipients:
+        if message_recipient.recipient == recipient:
+            message_recipient.delivery_id = delivery_id
+            break
+
+    return delivery_id
 
 def translate(text):
     if text:

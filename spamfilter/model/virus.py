@@ -34,7 +34,14 @@ virus_recipients_table = Table(
 mapper(VirusRecipient, virus_recipients_table)
 
 mapper(Virus, viruses_table,
-       properties=dict(recipients=relation(VirusRecipient, backref='virus')))
+       properties={
+           'recipients': relation(VirusRecipient, backref='virus'),
+           'contents': deferred(viruses_table.c.contents),
+           'subject': column_property(
+                func.extract_header(text("'Subject'"),
+                                    viruses_table.c.contents).label('subject'),
+                deferred=True)
+       })
 
 __all__ = ['Virus', 'viruses_table', 'VirusRecipient',
            'virus_recipients_table']
