@@ -143,8 +143,7 @@ def translate(text):
                 else:
                     translated.append(unicode(chunk[0]))
 
-            translated = u' '.join(translated)
-            return codecs.getencoder('utf8')(translated)[0]
+            return u''.join(translated)
         except:
             return text
     else:
