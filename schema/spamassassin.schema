@@ -97,16 +97,30 @@ CREATE FUNCTION extract_header(text, text) RETURNS text
 	endPos integer;
 	headerString text DEFAULT NULL;
 	headerText text DEFAULT NULL;
+	restText text DEFAULT NULL;
+	nextHeader text DEFAULT NULL;
 BEGIN
 	headerString := ''
 '' || header || '':'';	
 	startPos := strpos(content, headerString);
 	IF startPos > 0 THEN
-		headerText := substr(content, startPos + length(headerString),
-			length(content) - startPos - length(headerString));
-		endPos := strpos(headerText, ''
+		restText := substr(content, startPos + length(headerString));
+		endPos := strpos(restText, ''
 '');
-		headerText := substr(headerText, 1, endPos - 1);
+		headerText := substr(restText, 1, endPos - 1);
+		restText := substr(restText, endPos + 1);
+		LOOP
+			endPos := strpos(restText, ''
+'');
+			nextHeader := substr(restText, 1, endPos - 1);
+			IF length(nextHeader) = 0 OR substr(nextHeader, 1, 1) != '' '' OR
+				length(trim(leading from nextHeader)) = 0 THEN
+				EXIT;
+			END IF;
+
+			headerText := headerText || nextHeader;
+			restText = substr(restText, endPos + 1);
+		END LOOP;
 	END IF;
 
 	headerText := trim(both from headerText);
