@@ -132,7 +132,25 @@ def createDeliveryId(message, recipient):
 
     return delivery_id
 
+# This function tries to convert the text to Unicode. If that fails, then an
+# ascii-encoded string will be returned.
 def translate(text):
+    text = _translate(text)
+
+    # Some email headers are incorrectly encoded. If the text was not encoded
+    # according to RFC 2047, then we attempt to decode it to Unicode assuming
+    # that the encoding is utf8. If that fails then we convert the text to
+    # ascii encoding by deleting all non-ascii characters from the text.
+    if not isinstance(text, unicode):
+        try:
+            text = text.decode('utf8')
+        except:
+            text = ''.join([x for x in text if ord(x) < 128])
+
+    return text
+
+# Transform the text according to RFC 2047.
+def _translate(text):
     if text:
         try:
             chunks = decode_header(text)
