@@ -201,7 +201,7 @@ def checkSpamassassin(message, max_len, host=None):
 
     # The message is spam. We extract the tests from the rest of the output
     # from spamc.
-    pattern = re.compile(r'^\s*-?[\d\.]+\s+(\S+)\s+(.*)')
+    pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
     continuation = re.compile(r'^\s*\b(.*)')
     tests = []
     seen = False
@@ -212,15 +212,15 @@ def checkSpamassassin(message, max_len, host=None):
         elif seen:
             match = pattern.search(line)
             if match:
-                tests.append(match.group(1, 2))
+                tests.append(match.groups())
                 continue
 
             if tests:
                 match = continuation.search(line)
                 if match:
-                    test, description = tests[-1]
+                    test_score, test, description = tests[-1]
                     description += ' ' + match.group(1).strip()
-                    tests[-1] = (test, description)
+                    tests[-1] = (test_score, test, description)
 
     return False, score, tests
 
@@ -249,7 +249,7 @@ def checkClamav(message, host, port, timeout):
     return match.group(1) if match else None
 
 def determineSpamTests(session, tests):
-    names, descriptions = zip(*tests)
+    scores, names, descriptions = zip(*tests)
     spam_tests = []
     query = session.query(SpamTest)
     for i in range(len(names)):
@@ -268,9 +268,10 @@ def determineSpamTests(session, tests):
             spam_tests.append(spam_test)
         else:
             if names[i] != descriptions[i]:
-                test = SpamTest(name=names[i], description=descriptions[i])
+                test = SpamTest(name=names[i], description=descriptions[i],
+                                score=float(scores[i]))
             else:
-                test = SpamTest(name=names[i])
+                test = SpamTest(name=names[i], score=float(scores[i]))
 
             spam_tests.append(test)
 

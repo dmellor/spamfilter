@@ -42,7 +42,8 @@ spamtest_table = Table(
     'tests', meta,
     Column('id', Integer, Sequence('tests_id_seq'), primary_key=True),
     Column('name', String(255), nullable=False),
-    Column('description', TEXT, nullable=True))
+    Column('description', TEXT, nullable=True),
+    Column('score', Float(precision='double'), nullable=False))
 
 mapper(SpamTest, spamtest_table)
 

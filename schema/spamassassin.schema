@@ -420,7 +420,8 @@ ALTER TABLE public.spam_tests OWNER TO david;
 CREATE TABLE tests (
     id serial NOT NULL,
     name character varying(255) NOT NULL,
-    description text
+    description text,
+    score double precision NOT NULL
 );
 
 
