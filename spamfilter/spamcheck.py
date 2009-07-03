@@ -4,6 +4,7 @@ import socket
 import re
 import time
 import logging
+import email
 
 from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
@@ -16,6 +17,11 @@ SPAM = '250 Message was identified as spam and has been quarantined'
 VIRUS = '250 Message contains a virus and has been quarantined'
 
 Greylist = None
+
+class DisabledCharsetTests(object):
+    def __init__(self, value):
+        self.charset, tests = value.split(None, 1)
+        self.tests = tests.split()
 
 class SpamCheck(SmtpProxy, ConfigMixin):
     """
@@ -30,6 +36,19 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             self.getConfigItem('greylist', 'interval', 30))
         self.trusted_ips = self.getConfigItemList('sent_mail', 'trusted_ips')
         self.pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
+        self.getDisabledCharsetTests()
+
+    def getDisabledCharsetTests(self):
+        self.disabled_tests = []
+        num = 0
+        while True:
+            num += 1
+            value = self.getConfigItem(
+                'spamfilter', 'charset_disabled_tests%s' % num, None)
+            if not value:
+                break
+
+            self.disabled_tests.append(DisabledCharsetTests(value))
 
     def checkMessage(self, message):
         # If the sender is whitelisted then we do not want to perform any
@@ -107,8 +126,24 @@ class SpamCheck(SmtpProxy, ConfigMixin):
     def checkSpam(self, message):
         # Check the message and accept it if it is not spam.
         max_len = self.getConfigItem('spamfilter', 'max_message_length')
-        ok, score, tests = checkSpamassassin(message, max_len)
+        ok, score, required, tests = checkSpamassassin(message, max_len)
         if not ok:
+            # SpamAssassin does not deal well with some message character sets,
+            # causing some tests to fire incorrectly. The spam score is adjusted
+            # here by disabling the problem tests if they have fired.
+            charset = getCharsetFromContents(message)
+            disabled_tests = [x.tests for x in self.disabled_tests
+                              if x.charset == charset]
+            if disabled_tests:
+                disabled_tests = disabled_tests[0]
+                scores, names, descriptions = zip(*tests)
+                for i in range(len(names)):
+                    if name[i] in disabled_tests:
+                        score -= float(scores[i])
+
+                if score < required:
+                    return True
+
             # The message is spam. In case of false positives, the message is
             # quarantined.
             spam = Spam(mail_from=self.mail_from, ip_address=self.remote_addr,
@@ -197,7 +232,7 @@ def checkSpamassassin(message, max_len, host=None):
     # Extract the score, and determine if the message has passed.
     score, required = [float(x) for x in output.pop(0).split('/')]
     if score < required:
-        return True, score, None
+        return True, score, required, None
 
     # The message is spam. We extract the tests from the rest of the output
     # from spamc.
@@ -212,7 +247,7 @@ def checkSpamassassin(message, max_len, host=None):
         elif seen:
             match = pattern.search(line)
             if match:
-                test_score, test, description = math.groups()
+                test_score, test, description = match.groups()
                 description = description.strip()
                 tests.append((test_score, test, description))
                 continue
@@ -224,7 +259,7 @@ def checkSpamassassin(message, max_len, host=None):
                     description += ' ' + match.group(1).strip()
                     tests[-1] = (test_score, test, description)
 
-    return False, score, tests
+    return False, score, required, tests
 
 def checkClamav(message, host, port, timeout):
     timeout = float(timeout)
@@ -278,3 +313,18 @@ def determineSpamTests(session, tests):
             spam_tests.append(test)
 
     return spam_tests
+
+def getCharsetFromContents(contents):
+    return getCharsetFromMessage(email.message_from_string(contents))
+
+def getCharsetFromMessage(message):
+    charset = message.get_param('charset')
+    if not charset:
+        payload = message.get_payload()
+        if isinstance(payload, list):
+            for msg in payload:
+                charset = getCharsetFromMessage(msg)
+                if charset:
+                    break
+
+    return charset
