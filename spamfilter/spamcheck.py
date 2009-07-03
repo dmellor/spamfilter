@@ -202,7 +202,7 @@ def checkSpamassassin(message, max_len, host=None):
     # The message is spam. We extract the tests from the rest of the output
     # from spamc.
     pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
-    continuation = re.compile(r'^\s*\b([^\s\r\n]*)')
+    continuation = re.compile(r'^\s*\b([^\r\n]*)')
     tests = []
     seen = False
     for line in output:
@@ -212,7 +212,9 @@ def checkSpamassassin(message, max_len, host=None):
         elif seen:
             match = pattern.search(line)
             if match:
-                tests.append(match.groups())
+                test_score, test, description = math.groups()
+                description = description.strip()
+                tests.append((test_score, test, description))
                 continue
 
             if tests:
