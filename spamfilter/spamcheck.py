@@ -20,7 +20,8 @@ Greylist = None
 
 class DisabledCharsetTests(object):
     def __init__(self, value):
-        self.charset, tests = value.split(None, 1)
+        charset, tests = value.split(None, 1)
+        self.charset = charset.lower()
         self.tests = tests.split()
 
 class SpamCheck(SmtpProxy, ConfigMixin):
@@ -326,5 +327,7 @@ def getCharsetFromMessage(message):
                 charset = getCharsetFromMessage(msg)
                 if charset:
                     break
+    else:
+        charset = charset.lower()
 
     return charset
