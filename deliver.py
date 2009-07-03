@@ -80,7 +80,7 @@ def _confirm(url, spam):
     print '<html><head><title>Confirm Message Delivery</title></head>'
     print '<body><font size="+1">'
     print '<br>From: %s' % spam.mail_from
-    print '<br>Subject: %s' % translate(spam.subject)
+    print '<br>Subject: %s' % translate(spam.subject).encode('utf8')
     print '<br><br>This message has been quarantined for the following reasons'
     print '<ul>'
     for test in spam.tests:
