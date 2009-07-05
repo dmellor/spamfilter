@@ -23,7 +23,7 @@ class ConfigMixin(object):
 
 Session = None
 
-def createSession(dburi):
+def createSession(dburi, serializable=True):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     global Session
@@ -32,8 +32,11 @@ def createSession(dburi):
 
     engine = create_engine(dburi, convert_unicode=False, echo=False)
     session = Session(bind=engine.connect())
-    session.connection().execute(
-        'set transaction isolation level serializable')
+    connection = session.connection()
+    stmt = 'set session characteristics as transaction isolation level %s'
+    mode = 'serializable' if serializable else 'read committed'
+    connection.execute(stmt % mode)
+    session.commit()
     return session
 
 def queryPostfixDB(db, item):
