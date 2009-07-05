@@ -2,9 +2,10 @@ import os
 from subprocess import *
 import socket
 import re
-import time
 import logging
+import traceback
 import email
+from email.utils import parseaddr
 
 from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
@@ -12,6 +13,7 @@ from spamfilter.model.spam import Spam, SpamRecipient, SpamTest
 from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.model.sentmail import SentMail
+from spamfilter.model.autowhitelist import AutoWhitelist
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 VIRUS = '250 Message contains a virus and has been quarantined'
@@ -32,11 +34,13 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         global Greylist
         super(SpamCheck, self).__init__(**kws)
         self.readConfig(config)
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.session = createSession(
+            self.getConfigItem('database', 'dburi'), serializable=False)
         Greylist = createGreylistClass(
             self.getConfigItem('greylist', 'interval', 30))
         self.trusted_ips = self.getConfigItemList('sent_mail', 'trusted_ips')
         self.pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
+        self.host = self.getConfigItem('spamfilter', 'host')
         self.getDisabledCharsetTests()
 
     def getDisabledCharsetTests(self):
@@ -72,24 +76,17 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 return True
 
         # The client is an external client - perform the spam and virus checks.
-        retries = 0
-        num_retries = int(self.getConfigItem('general', 'retries', 2))
         message = ''.join(message)
         ok = False
-        while retries < num_retries:
-            err_status = None
-            try:
-                ok = self.performChecks(message)
-                self.session.commit()
-                break
-            except Exception, exc:
-                self.session.rollback()
-                err_status = re.sub(r'\r?\n', ' ', str(exc))
-                logging.info('spamcheck failed: %s', err_status)
-                retries += 1
-                wait_time = int(self.getConfigItem('general', 'wait', 5))
-                logging.info('sleeping for %s seconds', wait_time)
-                time.sleep(wait_time)
+        err_status = None
+        try:
+            ok = self.performChecks(message)
+            self.session.commit()
+        except Exception, exc:
+            self.session.rollback()
+            err_status = re.sub(r'\r?\n', ' ', str(exc))
+            logging.info('spamcheck failed: %s', err_status)
+            logging.info(traceback.format_exc())
                            
         if err_status:
             self.error_response = "451 %s" % err_status
@@ -127,24 +124,49 @@ class SpamCheck(SmtpProxy, ConfigMixin):
     def checkSpam(self, message):
         # Check the message and accept it if it is not spam.
         max_len = self.getConfigItem('spamfilter', 'max_message_length')
-        ok, score, required, tests = checkSpamassassin(message, max_len)
+        score, required, tests = checkSpamassassin(message, max_len)
+
+        # SpamAssassin does not deal well with some message character sets,
+        # causing some tests to fire incorrectly. The spam score is adjusted
+        # here by disabling the problem tests if they have fired.
+        msg_obj = email.message_from_string(message)
+        charset = getCharsetFromMessage(msg_obj)
+        disabled_tests = [x.tests for x in self.disabled_tests
+                          if x.charset == charset]
+        if disabled_tests:
+            disabled_tests = disabled_tests[0]
+            accepted_tests = []
+            adjusted_score = 0
+            for test in tests:
+                if test[1] in disabled_tests:
+                    adjusted_score += float(test[0])
+                else:
+                    accepted_tests.append(test)
+
+            tests = accepted_tests
+            score -= adjusted_score
+            if adjusted_score != 0:
+                # If the score needs to be adjusted then we must adjust
+                # the auto-whitelist scores that were updated by
+                # SpamAssassin.
+                ips = getReceivedIPs(msg_obj, self.host)
+                mail_from = parseaddr(
+                    msg_obj['From'] or msg_obj['Return-Path'])[1]
+                query = self.session.query(AutoWhitelist)
+                query = query.filter_by(email=mail_from)
+                processed_classbs = {}
+                for ip in ips:
+                    classb = '.'.join(ip.split('.')[:2])
+                    if classb in processed_classbs:
+                        continue
+
+                    processed_classbs[classb] = True
+                    record = query.filter_by(ip=classb).first()
+                    if record:
+                        record.totscore -= adjusted_score
+
+        ok = score < required
         if not ok:
-            # SpamAssassin does not deal well with some message character sets,
-            # causing some tests to fire incorrectly. The spam score is adjusted
-            # here by disabling the problem tests if they have fired.
-            charset = getCharsetFromContents(message)
-            disabled_tests = [x.tests for x in self.disabled_tests
-                              if x.charset == charset]
-            if disabled_tests:
-                disabled_tests = disabled_tests[0]
-                scores, names, descriptions = zip(*tests)
-                for i in range(len(names)):
-                    if name[i] in disabled_tests:
-                        score -= float(scores[i])
-
-                if score < required:
-                    return True
-
             # The message is spam. In case of false positives, the message is
             # quarantined.
             spam = Spam(mail_from=self.mail_from, ip_address=self.remote_addr,
@@ -230,13 +252,9 @@ def checkSpamassassin(message, max_len, host=None):
     if exit_code != 0:
         raise Exception('spamc returned exit code %s' % exit_code)
 
-    # Extract the score, and determine if the message has passed.
+    # Extract the score, and determine tests that fired from the output of
+    # spamc.
     score, required = [float(x) for x in output.pop(0).split('/')]
-    if score < required:
-        return True, score, required, None
-
-    # The message is spam. We extract the tests from the rest of the output
-    # from spamc.
     pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
     continuation = re.compile(r'^\s*\b([^\r\n]*)')
     tests = []
@@ -260,7 +278,7 @@ def checkSpamassassin(message, max_len, host=None):
                     description += ' ' + match.group(1).strip()
                     tests[-1] = (test_score, test, description)
 
-    return False, score, required, tests
+    return score, required, tests
 
 def checkClamav(message, host, port, timeout):
     timeout = float(timeout)
@@ -314,9 +332,6 @@ def determineSpamTests(session, tests):
             spam_tests.append(test)
 
     return spam_tests
-
-def getCharsetFromContents(contents):
-    return getCharsetFromMessage(email.message_from_string(contents))
 
 def getCharsetFromMessage(message):
     charset = message.get_param('charset')

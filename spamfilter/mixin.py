@@ -1,3 +1,5 @@
+import re
+
 class ConfigMixin(object):
     def readConfig(self, config_file):
         from ConfigParser import ConfigParser
@@ -48,3 +50,26 @@ def queryPostfixDB(db, item):
         return line.startswith('ok')
     else:
         return False
+
+def getReceivedIPs(message, host):
+    received = message.get_all('Received')
+    from_re = re.compile(r'^from\s+(\S+)')
+    ips = []
+    found_helo = False
+    for line in received:
+        match = from_re.search(line)
+        if match:
+            if match.group(1) == host:
+                continue
+            elif match.group(1) == 'localhost':
+                continue
+            else:
+                if not found_helo:
+                    helo = match.group(1)
+                    found_helo = True
+
+                match = re.search(r'\[([\d\.]+)\]', line)
+                if match:
+                    ips.append(match.group(1))
+
+    return ips
