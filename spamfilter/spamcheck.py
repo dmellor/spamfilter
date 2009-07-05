@@ -321,6 +321,11 @@ def determineSpamTests(session, tests):
                 names[i] != descriptions[i]):
                 spam_test.description = descriptions[i]
 
+            # Update the test's score if the saved score differs from the
+            # reported score.
+            if spam_test.score != scores[i]:
+                spam_test.score = scores[i]
+
             spam_tests.append(spam_test)
         else:
             if names[i] != descriptions[i]:
