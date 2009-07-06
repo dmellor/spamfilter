@@ -149,7 +149,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 # If the score needs to be adjusted then we must adjust
                 # the auto-whitelist scores that were updated by
                 # SpamAssassin.
-                ips = getReceivedIPs(msg_obj, self.host)
+                ips, helo = getReceivedIPsAndHelo(msg_obj, self.host)
                 mail_from = parseaddr(
                     msg_obj['From'] or msg_obj['Return-Path'])[1]
                 query = self.session.query(AutoWhitelist)

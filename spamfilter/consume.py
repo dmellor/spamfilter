@@ -39,7 +39,7 @@ class SpamConsumer(ConfigMixin):
     def saveSpam(self, message):
         # Extract the attached message and save it in the spam table.
         mail_from = parseaddr(message['Return-Path'] or message['From'])[1]
-        ips = getReceivedIPs(message, self.host)
+        ips, helo = getReceivedIPsAndHelo(message, self.host)
         fp = StringIO()
         g = Generator(fp, mangle_from_=False)
         g.flatten(message)
