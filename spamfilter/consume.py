@@ -1,5 +1,5 @@
 import re, sys
-from email.parser import FeedParser
+import email
 from cStringIO import StringIO
 from email.generator import Generator
 from email.utils import parseaddr
@@ -13,11 +13,7 @@ class SpamConsumer(ConfigMixin):
         self.readConfig(config)
 
     def process(self):
-        parser = FeedParser()
-        for line in sys.stdin:
-            parser.feed(line)
-
-        message = parser.close()
+        message = email.message_from_file(sys.stdin)
         self.session = createSession(self.getConfigItem('database', 'dburi'))
         self.host = self.getConfigItem('spamfilter', 'host')
         try:
@@ -30,6 +26,8 @@ class SpamConsumer(ConfigMixin):
     def processMessage(self, message):
         if message.get_content_type() == 'message/rfc822':
             self.saveSpam(message.get_payload()[0])
+        elif 'attachment' in (message['Content-Disposition'] or ''):
+            self.saveSpam(email.message_from_string(message.get_payload()))
         else:
             payload = message.get_payload()
             if isinstance(payload, list):
