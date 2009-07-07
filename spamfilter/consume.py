@@ -68,8 +68,7 @@ class SpamConsumer(ConfigMixin):
             processed_classbs[classb] = True
             record = query.filter_by(ip=classb).first()
             if record:
-                record.totscore += 1000
-                record.count += 1
+                record.totscore += record.count * 1000
             else:
                 record = AutoWhitelist(username='GLOBAL', email=mail_from,
                                        ip=classb, count=1, totscore=1000)
