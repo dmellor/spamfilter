@@ -3,12 +3,15 @@ import os
 import sys
 import site
 import smtplib
+import email
+from email.utils import parseaddr
 
 deployment_dir = sys.path[0]
 site.addsitedir('%s/lib/python2.6/site-packages' % deployment_dir)
 
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
+from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.report import translate
 from sqlalchemy import text
 
@@ -23,6 +26,7 @@ class Deliver(ConfigMixin):
 
         delivery_id = path_info[1:]
         self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.host = self.getConfigItem('spamfilter', 'host')
         try:
             method = os.getenv('REQUEST_METHOD')
             if method != 'GET' and method != 'POST':
@@ -59,18 +63,32 @@ class Deliver(ConfigMixin):
         else:
             recipient = spam_recipient.recipient
 
-        # Deliver the message.
-        mailServer = smtplib.SMTP('localhost')
-        mailServer.sendmail(spam.mail_from, recipient, spam.contents,
-                            ['BODY=8BITMIME'])
-        mailServer.quit()
-
         # Delete the entry in the spam_recipients table and the message if
         # the number of spam recipients has dropped to zero.
         self.session.delete(spam_recipient)
         query = self.session.query(SpamRecipient)
         if query.filter_by(spam_id=spam_recipient.spam_id).count() == 0:
             self.session.delete(spam)
+
+        # Adjust the auto-whitelist entry.
+        message = email.message_from_string(spam.contents)
+        mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
+        query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
+        ips, helo = getReceivedIPsAndHelo(message, self.host)
+        processed_classbs = {}
+        for ip in ips:
+            classb = '.'.join(ip.split('.')[:2])
+            if classb not in processed_classbs:
+                processed_classbs[classb] = True
+                record = query.filter_by(ip=classb).first()
+                if record:
+                    record.totscore -= spam.score
+
+        # Deliver the message.
+        mailServer = smtplib.SMTP('localhost')
+        mailServer.sendmail(spam.mail_from, recipient, spam.contents,
+                            ['BODY=8BITMIME'])
+        mailServer.quit()
 
         _success()
 
