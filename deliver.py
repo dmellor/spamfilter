@@ -70,7 +70,17 @@ class Deliver(ConfigMixin):
         if query.filter_by(spam_id=spam_recipient.spam_id).count() == 0:
             self.session.delete(spam)
 
-        # Adjust the auto-whitelist entry.
+        # Adjust the auto-whitelist entry. Care must be taken not to include
+        # the value of the AWL test if that fired for the message, as the
+        # increment added to the total score in the auto_whitelist table will
+        # not have included the score for the AWL test.
+        if 'AWL' in [x.name for x in spam.tests]:
+            adjustment = reduce(lambda x, y: x + y,
+                                [x.score for x in spam.tests
+                                 if x.name != 'AWL'])
+        else:
+            adjustment = spam.score
+
         message = email.message_from_string(spam.contents)
         mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
         query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
@@ -82,7 +92,7 @@ class Deliver(ConfigMixin):
                 processed_classbs[classb] = True
                 record = query.filter_by(ip=classb).first()
                 if record:
-                    record.totscore -= spam.score
+                    record.totscore -= adjustment
 
         # Deliver the message.
         mailServer = smtplib.SMTP('localhost')
