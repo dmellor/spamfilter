@@ -63,6 +63,12 @@ class Deliver(ConfigMixin):
         else:
             recipient = spam_recipient.recipient
 
+        # Retrieve the contents before deleting the message, as the contents
+        # are deferred and cannot be retrieved after the deletion (SQLAlchemy
+        # enters an infinite loop instead of throwing an exception).
+        contents = spam.contents
+        tests = spam.tests
+
         # Delete the entry in the spam_recipients table and the message if
         # the number of spam recipients has dropped to zero.
         self.session.delete(spam_recipient)
@@ -74,14 +80,14 @@ class Deliver(ConfigMixin):
         # the value of the AWL test if that fired for the message, as the
         # increment added to the total score in the auto_whitelist table will
         # not have included the score for the AWL test.
-        if 'AWL' in [x.name for x in spam.tests]:
+        if 'AWL' in [x.name for x in tests]:
             adjustment = reduce(lambda x, y: x + y,
-                                [x.score for x in spam.tests
+                                [x.score for x in tests
                                  if x.name != 'AWL'])
         else:
             adjustment = spam.score
 
-        message = email.message_from_string(spam.contents)
+        message = email.message_from_string(contents)
         mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
         query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
         ips, helo = getReceivedIPsAndHelo(message, self.host)
@@ -96,7 +102,7 @@ class Deliver(ConfigMixin):
 
         # Deliver the message.
         mailServer = smtplib.SMTP('localhost')
-        mailServer.sendmail(spam.mail_from, recipient, spam.contents,
+        mailServer.sendmail(spam.mail_from, recipient, contents,
                             ['BODY=8BITMIME'])
         mailServer.quit()
 
