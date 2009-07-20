@@ -22,7 +22,7 @@ class Deliver(ConfigMixin):
     def process(self):
         path_info = os.getenv('PATH_INFO')
         if path_info[0] != '/':
-            _invalidId()
+            invalidId()
 
         delivery_id = path_info[1:]
         self.session = createSession(self.getConfigItem('database', 'dburi'))
@@ -36,13 +36,13 @@ class Deliver(ConfigMixin):
                 delivery_id=delivery_id)
             spam_recipient = query.first()
             if not spam_recipient:
-                _invalidId()
+                invalidId()
 
             spam = self.session.query(Spam).get(spam_recipient.spam_id)
             if method == 'GET':
-                _confirm('http://' + os.getenv('SERVER_NAME') +
-                         os.getenv('SCRIPT_NAME') + os.getenv('PATH_INFO'),
-                         spam)
+                confirm('http://' + os.getenv('SERVER_NAME') +
+                        os.getenv('SCRIPT_NAME') + os.getenv('PATH_INFO'),
+                        spam)
             else:
                 self.deliver(spam, spam_recipient)
 
@@ -105,10 +105,9 @@ class Deliver(ConfigMixin):
         mailServer.sendmail(spam.mail_from, recipient, contents,
                             ['BODY=8BITMIME'])
         mailServer.quit()
+        success()
 
-        _success()
-
-def _confirm(url, spam):
+def confirm(url, spam):
     print 'Content-Type: text/html; charset=utf-8'
     print
     print '<html><head><title>Confirm Message Delivery</title></head>'
@@ -127,14 +126,14 @@ def _confirm(url, spam):
     print 'action="%s"' % url, '>'
     print '<input type="submit" value="Deliver message"></form></body></html>'
 
-def _invalidId():
+def invalidId():
     print "Content-Type: text/html"
     print
     print "<html><head><title>Invalid Message ID</title></head>"
     print "<body><h2>An invalid message id was specified.</h2></body></html>"
     sys.exit()
     
-def _success():
+def success():
     print "Content-Type: text/html"
     print
     print "<html><head><title>Message Queued For Delivery</title></head>"
