@@ -82,8 +82,7 @@ class Deliver(ConfigMixin):
         # not have included the score for the AWL test.
         if 'AWL' in [x.name for x in tests]:
             adjustment = reduce(lambda x, y: x + y,
-                                [x.score for x in tests
-                                 if x.name != 'AWL'])
+                                [x.score for x in tests if x.name != 'AWL'])
         else:
             adjustment = spam.score
 
@@ -112,7 +111,9 @@ def confirm(url, spam):
     print
     print '<html><head><title>Confirm Message Delivery</title></head>'
     print '<body><font size="+1">'
-    print '<br>From: %s' % spam.mail_from
+    if spam.mail_from:
+        print '<br>From: %s' % spam.mail_from
+
     print '<br>Subject: %s' % translate(spam.subject).encode('utf8')
     print '<br><br>This message has been quarantined for the following reasons'
     print '<ul>'
@@ -120,11 +121,90 @@ def confirm(url, spam):
         if test.description:
             print '<li>%s</li>' % test.description
 
-    print '</ul></font>'
+    print '</ul>'
+    print '<br>The contents of the message are:'
+    print '</font>'
+    print '<table border="1"><tr>'
+    print '<td><pre>%s</pre></td>' % extractMessageBody(spam.contents)
+    print '</tr></table>'
     print '<h2>Click the button to deliver the message to your mailbox.</h2>'
     print '<form method="POST" enctype="application/x-www-form-urlencoded"'
     print 'action="%s"' % url, '>'
     print '<input type="submit" value="Deliver message"></form></body></html>'
+
+def extractMessageBody(contents):
+    message = email.message_from_string(contents)
+    body, content_type, charset = getBodyTypeCharset(message)
+    if charset:
+        body = body.decode(charset).encode('utf8')
+
+    if content_type == 'text/html':
+        from subprocess import Popen, PIPE
+        command = ['/usr/bin/lynx', '-stdin', '-dump']
+        env = os.environ.copy()
+        env['HOME'] = '/tmp'
+        lynx = Popen(command, shell=False, stdin=PIPE, stdout=PIPE, env=env)
+        lynx.stdin.write(body)
+        lynx.stdin.close()
+        body = ''.join(lynx.stdout.readlines())
+        lynx.wait()
+
+    return fixLongParagraphs(body)
+
+def getBodyTypeCharset(message):
+    payload = message.get_payload()
+    content_type = message.get_content_type()
+    charset = message.get_param('charset')
+    if not isinstance(payload, list):
+        if content_type in ('text/plain', 'text/html'):
+            body = payload
+            transfer_encoding = message.get('Content-Transfer-Encoding', '')
+            transfer_encoding = transfer_encoding.lower()
+            if transfer_encoding == 'quoted-printable':
+                import quopri
+                body = quopri.decodestring(body)
+            elif transfer_encoding == 'base64':
+                import base64
+                body = base64.b64decode(body)
+        else:
+            body = None
+    else:
+        for msg in payload:
+            body, content_type, charset = getBodyTypeCharset(msg)
+            if body:
+                break
+
+    return body, content_type, charset
+
+def fixLongParagraphs(body):
+    from textwrap import TextWrapper
+    wrapper = TextWrapper(width=120, break_long_words=False)
+    lines = body.splitlines()
+    modified_lines = []
+    num_lines = len(lines)
+    for i in xrange(num_lines):
+        curlen = len(lines[i].strip())
+        if curlen != 0:
+            if i == 0:
+                prev_clear = True
+            else:
+                prev_clear = len(lines[i - 1].strip()) == 0
+
+            if i == num_lines - 1:
+                next_clear = True
+            else:
+                next_clear = len(lines[i + 1].strip()) == 0
+
+            if prev_clear and next_clear:
+                line = lines[i].decode('utf8')
+                modified_lines.extend([x.encode('utf8')
+                                       for x in wrapper.wrap(line)])
+            else:
+                modified_lines.append(lines[i])
+        else:
+            modified_lines.append('')
+
+    return '\n'.join(modified_lines)
 
 def invalidId():
     print "Content-Type: text/html"
