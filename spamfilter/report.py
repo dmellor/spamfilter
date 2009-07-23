@@ -165,4 +165,7 @@ def _translate(text):
         except:
             return text
     else:
-        return text
+        # If the text was None, it is converted to an empty string in order to
+        # prevent 'NoneType' object is not iterable when the return value of
+        # this function is treated as a string.
+        return '' if text is None else text
