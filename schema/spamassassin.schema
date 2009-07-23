@@ -101,8 +101,8 @@ CREATE FUNCTION extract_header(text, text) RETURNS text
 	nextHeader text DEFAULT NULL;
 BEGIN
 	headerString := ''
-'' || header || '':'';	
-	startPos := strpos(content, headerString);
+'' || lower(header) || '':'';
+	startPos := strpos(lower(content), headerString);
 	IF startPos > 0 THEN
 		restText := substr(content, startPos + length(headerString));
 		endPos := strpos(restText, ''
