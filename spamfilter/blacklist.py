@@ -21,7 +21,7 @@ class BlacklistPolicy(GreylistPolicy):
         self.soft_threshold = int(manager.getConfigItem(
             'blacklist', 'soft_threshold', 1))
         self.hard_threshold = int(manager.getConfigItem(
-            'blacklist', 'hard_treshold', 3))
+            'blacklist', 'hard_threshold', 3))
         self.soft_classc_threshold = int(manager.getConfigItem(
             'blacklist', 'soft_classc_threshold', 2))
         self.hard_classc_threshold = int(manager.getConfigItem(
