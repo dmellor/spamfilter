@@ -115,7 +115,9 @@ def confirm(url, spam):
         print '<br>From: %s' % spam.mail_from
 
     print '<br>Subject: %s' % translate(spam.subject).encode('utf8')
-    print '<br><br>This message has been quarantined for the following reasons'
+    reason = 'reasons' if len(spam.tests) > 1 else 'reason'
+    print '<br><br>This message has been quarantined for the following %s:' % \
+        reason
     print '<ul>'
     for test in spam.tests:
         if test.description:
