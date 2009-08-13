@@ -1,5 +1,7 @@
 import re, sys
 import email
+import base64
+import quopri
 from cStringIO import StringIO
 from email.generator import Generator
 from email.utils import parseaddr
@@ -25,7 +27,15 @@ class SpamConsumer(ConfigMixin):
 
     def processMessage(self, message):
         if message.get_content_type() == 'message/rfc822':
-            self.saveSpam(message.get_payload()[0])
+            embedded = message.get_payload(0)
+            if message['Content-Transfer-Encoding'] == 'base64':
+                embedded = email.message_from_string(
+                    base64.b64decode(embedded.get_payload()))
+            elif message['Content-Transfer-Encoding'] == 'quoted-printable':
+                embedded = email.message_from_string(
+                    quopri.decodestring(embedded.get_payload()))
+            
+            self.saveSpam(embedded)
         elif 'attachment' in (message['Content-Disposition'] or ''):
             self.saveSpam(email.message_from_string(message.get_payload()))
         else:
