@@ -43,7 +43,7 @@ class GreylistPolicy(Policy):
                 # done here. This requires that the blacklist policy appear
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
-            elif (record.accepted or status == ACCEPTED or
+            elif ((record.accepted and not status.startswith(HARD_REJECTED)) or
                   self.isAccepted(mail_from, rcpt_to, ip_address)):
                 record.last_instance = instance
                 record.successful += 1
