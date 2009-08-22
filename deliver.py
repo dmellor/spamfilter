@@ -198,9 +198,12 @@ def fixLongParagraphs(body):
                 next_clear = len(lines[i + 1].strip()) == 0
 
             if prev_clear and next_clear:
-                line = lines[i].decode('utf8')
-                modified_lines.extend([x.encode('utf8')
-                                       for x in wrapper.wrap(line)])
+                try:
+                    line = lines[i].decode('utf8')
+                    modified_lines.extend([x.encode('utf8')
+                                           for x in wrapper.wrap(line)])
+                except UnicodeDecodeError:
+                    modified_lines.append(lines[i])
             else:
                 modified_lines.append(lines[i])
         else:
