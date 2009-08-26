@@ -346,6 +346,7 @@ def getCharsetFromMessage(message):
             for msg in payload:
                 charset = getCharsetFromMessage(msg)
                 if charset:
+                    charset = charset.lower()
                     break
     else:
         charset = charset.lower()
