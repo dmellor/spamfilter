@@ -46,7 +46,8 @@ class SpamConsumer(ConfigMixin):
 
     def saveSpam(self, message):
         # Extract the attached message and save it in the spam table.
-        mail_from = parseaddr(message['Return-Path'] or message['From'])[1]
+        mail_from = parseaddr(
+            message['Return-Path'] or message['From'])[1].lower()
         ips, helo = getReceivedIPsAndHelo(message, self.host)
         fp = StringIO()
         g = Generator(fp, mangle_from_=False)
@@ -66,7 +67,8 @@ class SpamConsumer(ConfigMixin):
             self.session.delete(greylist)
 
         # Update the auto-whitelist score.
-        mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
+        mail_from = parseaddr(
+            message['From'] or message['Return-Path'])[1].lower()
         query = self.session.query(AutoWhitelist)
         query = query.filter_by(email=mail_from)
         processed_classbs = {}

@@ -87,7 +87,8 @@ class Deliver(ConfigMixin):
             adjustment = spam.score
 
         message = email.message_from_string(contents)
-        mail_from = parseaddr(message['From'] or message['Return-Path'])[1]
+        mail_from = parseaddr(
+            message['From'] or message['Return-Path'])[1].lower()
         query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
         ips, helo = getReceivedIPsAndHelo(message, self.host)
         processed_classbs = {}
