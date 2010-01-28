@@ -151,7 +151,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 # SpamAssassin.
                 ips, helo = getReceivedIPsAndHelo(msg_obj, self.host)
                 mail_from = parseaddr(
-                    msg_obj['From'] or msg_obj['Return-Path'])[1]
+                    msg_obj['From'] or msg_obj['Return-Path'])[1].lower()
                 query = self.session.query(AutoWhitelist)
                 query = query.filter_by(email=mail_from)
                 processed_classbs = {}
@@ -175,6 +175,14 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             recipients = self.getUniqueRecipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.add(spam)
+
+            # Fix the AWL - this accounts for spam in which the envelope header
+            # is different from the From: header, in which case SpamAssassin
+            # will not update the entry corresponding to the envelope header. If
+            # the AWL entry for the envelope header is below the spam threshold,
+            # then this allows the message to avoid greylisting or blacklisting
+            # in the policy check because it will pass the isAccepted method.
+            self.fixAWL(msg_obj, score)
 
             # Set the error response to be written to the mail log.
             self.error_response = SPAM
@@ -231,6 +239,23 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                                               recipient=recipient))
 
         return is_sent_mail
+
+    def fixAWL(self, message, score):
+        # If the envelope sender is different from the address in the From:
+        # header, then we update the AWL record for the envelope sender.
+        header = parseaddr(
+            message['From'] or message['Return-Path'])[1].lower()
+        if header != self.mail_from:
+            query = self.session.query(AutoWhitelist)
+            classb = '.'.join(self.remote_addr.split('.')[:2])
+            record = query.filter_by(email=self.mail_from, ip=classb).first()
+            if record:
+                record.totscore += score
+                record.count += 1
+            else:
+                record = AutoWhitelist(username='GLOBAL', email=self.mail_from,
+                                       ip=classb, count=1, totscore=score)
+                self.session.add(record)
 
 def checkSpamassassin(message, max_len, host=None):
     command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
