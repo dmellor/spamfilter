@@ -245,7 +245,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # header, then we update the AWL record for the envelope sender.
         header = parseaddr(
             message['From'] or message['Return-Path'])[1].lower()
-        if header != self.mail_from:
+        if self.mail_from and header != self.mail_from:
             query = self.session.query(AutoWhitelist)
             classb = '.'.join(self.remote_addr.split('.')[:2])
             record = query.filter_by(email=self.mail_from, ip=classb).first()
