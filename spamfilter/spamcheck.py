@@ -61,14 +61,15 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # consistently and incorrectly flags as spam.
         whitelist_db = self.getConfigItem('spamfilter', 'whitelist_db', None)
         if whitelist_db:
-            if self.mail_from:
+            if self.bounce:
                 # First check the full address.
-                if queryPostfixDB(whitelist_db, self.mail_from):
+                mail_from = self.bounce.lower()
+                if queryPostfixDB(whitelist_db, mail_from):
                     return True
 
                 # Check the domain.
-                domain = self.mail_from.index('@') + 1
-                if queryPostfixDB(whitelist_db, self.mail_from[domain:]):
+                domain = mail_from.index('@') + 1
+                if queryPostfixDB(whitelist_db, mail_from[domain:]):
                     return True
 
             # Check if the HELO string is whitelisted.
@@ -111,8 +112,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         if not ok:
             ip_address = '.'.join(self.remote_addr.split('.')[:3])
             query = self.session.query(Greylist)
-            query = query.filter_by(mail_from=self.mail_from,
-                                    ip_address=ip_address)
+            mail_from = self.bounce.lower() if self.bounce else None
+            query = query.filter_by(mail_from=mail_from, ip_address=ip_address)
             recipients = self.getUniqueRecipients()
             for recipient in recipients:
                 entry = query.filter_by(rcpt_to=recipient).first()
@@ -169,7 +170,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         if not ok:
             # The message is spam. In case of false positives, the message is
             # quarantined.
-            spam = Spam(mail_from=self.mail_from, ip_address=self.remote_addr,
+            spam = Spam(bounce=self.bounce, ip_address=self.remote_addr,
                         helo=self.remote_host, contents=message, score=score,
                         tests=determineSpamTests(self.session, tests))
             recipients = self.getUniqueRecipients()
@@ -197,7 +198,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         virus_type = checkClamav(message, host, port, timeout)
         if virus_type:
             # The message is a virus and must be quarantined.
-            virus = Virus(mail_from=self.mail_from, helo=self.remote_host,
+            virus = Virus(bounce=self.bounce, helo=self.remote_host,
                           ip_address=self.remote_addr, contents=message,
                           virus=virus_type)
             recipients = self.getUniqueRecipients()
@@ -226,16 +227,16 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         if not is_sent_mail and self.pop_db:
             is_sent_mail = queryPostfixDB(self.pop_db, self.remote_addr)
 
-        if is_sent_mail and self.mail_from:
-            query = self.session.query(SentMail).filter_by(
-                sender=self.mail_from)
+        if is_sent_mail and self.bounce:
+            mail_from = self.bounce.lower()
+            query = self.session.query(SentMail).filter_by(sender=mail_from)
             recipients = self.getUniqueRecipients()
             for recipient in recipients:
                 record = query.filter_by(recipient=recipient).first()
                 if record:
                     record.messages += 1
                 else:
-                    self.session.add(SentMail(sender=self.mail_from,
+                    self.session.add(SentMail(sender=mail_from,
                                               recipient=recipient))
 
         return is_sent_mail
@@ -245,15 +246,16 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # header, then we update the AWL record for the envelope sender.
         header = parseaddr(
             message['From'] or message['Return-Path'])[1].lower()
-        if self.mail_from and header != self.mail_from:
+        if self.bounce and header != self.bounce.lower():
+            mail_from = self.bounce.lower()
             query = self.session.query(AutoWhitelist)
             classb = '.'.join(self.remote_addr.split('.')[:2])
-            record = query.filter_by(email=self.mail_from, ip=classb).first()
+            record = query.filter_by(email=mail_from, ip=classb).first()
             if record:
                 record.totscore += score
                 record.count += 1
             else:
-                record = AutoWhitelist(username='GLOBAL', email=self.mail_from,
+                record = AutoWhitelist(username='GLOBAL', email=mail_from,
                                        ip=classb, count=1, totscore=score)
                 self.session.add(record)
 

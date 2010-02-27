@@ -58,7 +58,7 @@ i += 1
 %>
 <tr bgcolor="${colour}">
 <td>
-<font face="Arial, Helvetica, sans-serif" size="-1">${msg.mail_from}</font>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.bounce}</font>
 </td>
 <td>
 <font face="Arial, Helvetica, sans-serif" size="-1">${msg.subject}</font>
@@ -121,7 +121,7 @@ i += 1
 %>
 <tr bgcolor="${colour}">
 <td>
-<font face="Arial, Helvetica, sans-serif" size="-1">${msg.mail_from}</font>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.bounce}</font>
 </td>
 <td>
 <font face="Arial, Helvetica, sans-serif" size="-1">${msg.subject}</font>

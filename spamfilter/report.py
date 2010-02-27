@@ -105,7 +105,7 @@ class ReportGenerator(ConfigMixin):
 def createMessageSummaries(messages, recipient):
     # Order the messages by date, and then create a summary of each message.
     messages.sort(key=lambda x: x.created)
-    return [MessageSummary(mail_from=x.mail_from, subject=translate(x.subject),
+    return [MessageSummary(bounce=x.bounce, subject=translate(x.subject),
                            date=x.created.replace(microsecond=0),
                            delivery_id=createDeliveryId(x, recipient))
             for x in messages]
@@ -115,8 +115,8 @@ def createDeliveryId(message, recipient):
 
     # The MAIL FROM header can be null, if the spam was impersonating a bounce
     # message.
-    if message.mail_from:
-        digest.update(message.mail_from)
+    if message.bounce:
+        digest.update(message.bounce)
 
     # The subject can be null in some incorrectly formatted Asian spam.
     if message.subject:

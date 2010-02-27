@@ -10,7 +10,7 @@ class Spam(object):
 spam_table = Table(
     'spam', meta,
     Column('id', Integer, Sequence('spam_id_seq'), primary_key=True),
-    Column('mail_from', String(1024), nullable=True),
+    Column('bounce', String(1024), nullable=True),
     Column('ip_address', String(15), nullable=False),
     Column('helo', String(1024), nullable=False),
     Column('contents', TEXT, nullable=False),

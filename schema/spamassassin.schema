@@ -363,7 +363,7 @@ ALTER TABLE public.spam_id_seq OWNER TO david;
 
 CREATE TABLE spam (
     id integer DEFAULT nextval('spam_id_seq'::regclass) NOT NULL,
-    mail_from character varying(1024),
+    bounce character varying(1024),
     ip_address character varying(15) NOT NULL,
     helo character varying(1024) NOT NULL,
     contents text NOT NULL,
@@ -473,7 +473,7 @@ ALTER TABLE public.viruses_id_seq OWNER TO david;
 
 CREATE TABLE viruses (
     id integer DEFAULT nextval('viruses_id_seq'::regclass) NOT NULL,
-    mail_from character varying(1024),
+    bounce character varying(1024),
     ip_address character varying(15) NOT NULL,
     helo character varying(1024) NOT NULL,
     contents text NOT NULL,

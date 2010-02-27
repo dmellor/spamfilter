@@ -102,7 +102,7 @@ class Deliver(ConfigMixin):
 
         # Deliver the message.
         mailServer = smtplib.SMTP('localhost')
-        mailServer.sendmail(spam.mail_from, recipient, contents,
+        mailServer.sendmail(spam.bounce, recipient, contents,
                             ['BODY=8BITMIME'])
         mailServer.quit()
         success()
@@ -112,8 +112,8 @@ def confirm(url, spam):
     print
     print '<html><head><title>Confirm Message Delivery</title></head>'
     print '<body><font size="+1">'
-    if spam.mail_from:
-        print '<br>From: %s' % spam.mail_from
+    if spam.bounce:
+        print '<br>From: %s' % spam.bounce
 
     print '<br>Subject: %s' % translate(spam.subject).encode('utf8')
     reason = 'reasons' if len(spam.tests) > 1 else 'reason'

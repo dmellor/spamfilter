@@ -26,7 +26,7 @@ class SmtpProxy(netcmd.NetCommand):
         self.host = host
         self.port = port
         self.rcpt_to = []
-        self.mail_from = None
+        self.bounce = None
         self.remote_addr = None
         self.remote_host = None
         self.error_response = None
@@ -69,7 +69,7 @@ class SmtpProxy(netcmd.NetCommand):
                 # Reset the attributes in case more than one message is being
                 # processed.
                 self.rcpt_to = []
-                self.mail_from = None
+                self.bounce = None
                 self.remote_addr = None
                 self.remote_host = None
                 self.error_response = None
@@ -199,10 +199,7 @@ class SmtpProxy(netcmd.NetCommand):
         for token in command[1:]:
             match = addr_regexp.search(token)
             if match:
-                address = match.group(1).lstrip().rstrip().lower()
-                if address:
-                    self.mail_from = address
-
+                self.bounce = match.group(1).lstrip().rstrip()
                 return
     
     def rcpt(self, command):
