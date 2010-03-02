@@ -1,4 +1,3 @@
-import re, sys
 import email
 import base64
 import quopri
@@ -9,40 +8,21 @@ from spamfilter.model.spam import Spam
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.mixin import *
+from spamfilter.extract import EmailExtractor
 
-class SpamConsumer(ConfigMixin):
+class SpamConsumer(EmailExtractor, ConfigMixin):
     def __init__(self, config):
         self.readConfig(config)
-
-    def process(self):
-        message = email.message_from_file(sys.stdin)
         self.session = createSession(self.getConfigItem('database', 'dburi'))
         self.host = self.getConfigItem('spamfilter', 'host')
+
+    def actOnMessage(self, message):
         try:
-            self.processMessage(message)
+            self.saveSpam(message)
             self.session.commit()
         except:
             self.session.rollback()
             raise
-
-    def processMessage(self, message):
-        if message.get_content_type() == 'message/rfc822':
-            embedded = message.get_payload(0)
-            if message['Content-Transfer-Encoding'] == 'base64':
-                embedded = email.message_from_string(
-                    base64.b64decode(embedded.get_payload()))
-            elif message['Content-Transfer-Encoding'] == 'quoted-printable':
-                embedded = email.message_from_string(
-                    quopri.decodestring(embedded.get_payload()))
-            
-            self.saveSpam(embedded)
-        elif 'attachment' in (message['Content-Disposition'] or ''):
-            self.saveSpam(email.message_from_string(message.get_payload()))
-        else:
-            payload = message.get_payload()
-            if isinstance(payload, list):
-                for p in payload:
-                    self.processMessage(p)
 
     def saveSpam(self, message):
         # Extract the attached message and save it in the spam table.

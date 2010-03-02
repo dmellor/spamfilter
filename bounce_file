@@ -1,0 +1,12 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+. bin/activate
+exec python -c '
+import sys
+sys.argv[0] = "bounce_file"
+from spamfilter.bounce import bounce_file
+bounce_file()
+sys.exit(0)' "$*"

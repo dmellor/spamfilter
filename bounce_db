@@ -1,0 +1,20 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+if [ -z "$2" ]; then
+    config=config.ini
+	spam_id="$1"
+else
+    config="$1"
+	spam_id="$2"
+fi
+
+. bin/activate
+exec python -c '
+import sys
+sys.argv[0] = "bounce_db"
+from spamfilter.bounce import bounce_db
+bounce_db()
+sys.exit(0)' "$config" "$spam_id"
