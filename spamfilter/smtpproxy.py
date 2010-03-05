@@ -199,7 +199,10 @@ class SmtpProxy(netcmd.NetCommand):
         for token in command[1:]:
             match = addr_regexp.search(token)
             if match:
-                self.bounce = match.group(1).lstrip().rstrip()
+                address = match.group(1).lstrip().rstrip()
+                if address:
+                    self.bounce = address
+
                 return
     
     def rcpt(self, command):
