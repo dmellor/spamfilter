@@ -67,7 +67,8 @@ def getReceivedIPsAndHelo(message, host):
                 if not helo:
                     helo = match.group(1)
 
-                match = re.search(r'\[([\d\.]+)\]', line)
+                # Match the last IP address on the received line.
+                match = re.search(r'\[([\d\.]+)\][^\[]*$', line)
                 if match:
                     ips.append(match.group(1))
 
