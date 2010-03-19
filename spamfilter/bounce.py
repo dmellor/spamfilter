@@ -76,7 +76,7 @@ def generate_bounce(spam, sender):
 
 def bounce_file():
     bouncer = FileBouncer()
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 1 or sys.argv[1] == '-':
         bouncer.process()
     else:
         fp = open(sys.argv[1])
