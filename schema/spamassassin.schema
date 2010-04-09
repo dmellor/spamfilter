@@ -101,7 +101,7 @@ CREATE FUNCTION extract_header(text, text) RETURNS text
 	nextHeader text DEFAULT NULL;
 BEGIN
 	headerString := ''
-'' || lower(header) || '':'';
+'' || lower(header) || '':'';	
 	startPos := strpos(lower(content), headerString);
 	IF startPos > 0 THEN
 		restText := substr(content, startPos + length(headerString));
@@ -222,28 +222,6 @@ END;
 
 ALTER FUNCTION public.stamp() OWNER TO david;
 
-SET default_tablespace = '';
-
-SET default_with_oids = false;
-
---
--- Name: auto_whitelist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE auto_whitelist (
-    id integer DEFAULT nextval(('auto_whitelist_id_seq'::text)::regclass) NOT NULL,
-    username character varying(1024) NOT NULL,
-    email character varying(1024) NOT NULL,
-    ip character varying(15) NOT NULL,
-    count integer NOT NULL,
-    totscore double precision NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL,
-    modified timestamp with time zone NOT NULL
-);
-
-
-ALTER TABLE public.auto_whitelist OWNER TO david;
-
 --
 -- Name: auto_whitelist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
@@ -256,6 +234,29 @@ CREATE SEQUENCE auto_whitelist_id_seq
 
 
 ALTER TABLE public.auto_whitelist_id_seq OWNER TO david;
+
+SET default_tablespace = '';
+
+SET default_with_oids = false;
+
+--
+-- Name: auto_whitelist; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE auto_whitelist (
+    id integer DEFAULT nextval('auto_whitelist_id_seq'::regclass) NOT NULL,
+    username character varying(1024) NOT NULL,
+    email character varying(1024) NOT NULL,
+    ip character varying(40) NOT NULL,
+    count integer NOT NULL,
+    totscore double precision NOT NULL,
+    signedby character varying(255) DEFAULT ''::character varying NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    modified timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE public.auto_whitelist OWNER TO david;
 
 --
 -- Name: domain_names; Type: TABLE; Schema: public; Owner: david; Tablespace: 
@@ -589,7 +590,7 @@ ALTER TABLE ONLY viruses
 -- Name: auto_whitelist_address_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (username, email, ip);
+CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (username, email, ip, signedby);
 
 
 --
@@ -738,16 +739,6 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
 --
--- Name: auto_whitelist; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE auto_whitelist FROM PUBLIC;
-REVOKE ALL ON TABLE auto_whitelist FROM david;
-GRANT ALL ON TABLE auto_whitelist TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist TO qmail;
-
-
---
 -- Name: auto_whitelist_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
@@ -755,6 +746,16 @@ REVOKE ALL ON TABLE auto_whitelist_id_seq FROM PUBLIC;
 REVOKE ALL ON TABLE auto_whitelist_id_seq FROM david;
 GRANT ALL ON TABLE auto_whitelist_id_seq TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
+
+
+--
+-- Name: auto_whitelist; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE auto_whitelist FROM PUBLIC;
+REVOKE ALL ON TABLE auto_whitelist FROM david;
+GRANT ALL ON TABLE auto_whitelist TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist TO qmail;
 
 
 --
