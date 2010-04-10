@@ -4,9 +4,9 @@ import base64
 import quopri
 
 class EmailExtractor(object):
-    def process(self, fp=sys.stdin):
-        message = email.message_from_file(fp)
-        self.processMessage(message)
+    def process(self, fp):
+        self.original_message = ''.join(fp.readlines())
+        self.processMessage(email.message_from_string(self.original_message))
 
     def processMessage(self, message):
         if message.get_content_type() == 'message/rfc822':
