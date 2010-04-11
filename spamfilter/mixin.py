@@ -1,4 +1,5 @@
 import re
+from subprocess import *
 
 class ConfigMixin(object):
     def readConfig(self, config_file):
@@ -73,3 +74,41 @@ def getReceivedIPsAndHelo(message, host):
                     ips.append(match.group(1))
 
     return ips, helo
+
+def getDKIMDomain(message_object, original_message):
+    header1 = message_object.get_all('DKIM-Signature', [None])[0]
+    header2 = message_object.get_all('DomainKey-Signature', [None])[0]
+    if header1 and header2:
+        flags = re.M | re.I
+        match1 = re.search(r'^DKIM-Signature:', original_message, flags)
+        match2 = re.search(r'^DomainKey-Signature:', original_message, flags)
+        header = header1 if match1.start() < match2.start() else header2
+    else:
+        header = header1 or header2
+
+    domain = ''
+    if header:
+        match = re.search(r'\bd=([^;\s]+)', header)
+        if match:
+            domain = match.group(1)
+
+    return domain
+
+def isDKIMVerified(original_message):
+    # We use the Perl Mail::DKIM::Verifier package, as this is the same code
+    # that is used by SpamAssassin. There is currently no adequate pure Python
+    # solution for verifying DKIM signatures, as pydkim is buggy and sometimes
+    # generates false negatives on validy signed messages.
+    message = '\r\n'.join(original_message.split('\n'))
+    process = Popen(
+        ['perl', '-MMail::DKIM::Verifier', '-e',
+         '$d = new Mail::DKIM::Verifier; $d->load(*STDIN); print $d->result;'],
+        stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+    process.stdin.write(message)
+    process.stdin.close()
+    result = process.stdout.readline()
+    ret_code = process.wait()
+    if ret_code != 0:
+        raise Exception('DKIM verification failed: return code %s' % ret_code)
+
+    return result == 'pass'

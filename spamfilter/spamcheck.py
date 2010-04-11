@@ -131,6 +131,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # causing some tests to fire incorrectly. The spam score is adjusted
         # here by disabling the problem tests if they have fired.
         msg_obj = email.message_from_string(message)
+        dkim_domain = getDKIMDomain(msg_obj, message)
+        if dkim_domain and not isDKIMVerified(message):
+            dkim_domain = ''
+
         charset = getCharsetFromMessage(msg_obj)
         disabled_tests = [x.tests for x in self.disabled_tests
                           if x.charset == charset]
@@ -154,7 +158,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 mail_from = parseaddr(
                     msg_obj['From'] or msg_obj['Return-Path'])[1].lower()
                 query = self.session.query(AutoWhitelist)
-                query = query.filter_by(email=mail_from)
+                query = query.filter_by(email=mail_from, signedby=dkim_domain)
                 processed_classbs = {}
                 for ip in ips:
                     classb = '.'.join(ip.split('.')[:2])
@@ -183,7 +187,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # the AWL entry for the envelope header is below the spam threshold,
             # then this allows the message to avoid greylisting or blacklisting
             # in the policy check because it will pass the isAccepted method.
-            self.fixAWL(msg_obj, score)
+            self.fixAWL(msg_obj, dkim_domain, score)
 
             # Set the error response to be written to the mail log.
             self.error_response = SPAM
@@ -241,7 +245,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return is_sent_mail
 
-    def fixAWL(self, message, score):
+    def fixAWL(self, message, dkim_domain, score):
         # If the envelope sender is different from the address in the From:
         # header, then we update the AWL record for the envelope sender.
         header = parseaddr(
@@ -250,13 +254,16 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             mail_from = self.bounce.lower()
             query = self.session.query(AutoWhitelist)
             classb = '.'.join(self.remote_addr.split('.')[:2])
-            record = query.filter_by(email=mail_from, ip=classb).first()
+            query = query.filter_by(email=mail_from, ip=classb,
+                                    signedby=dkim_domain)
+            record = query.first()
             if record:
                 record.totscore += score
                 record.count += 1
             else:
                 record = AutoWhitelist(username='GLOBAL', email=mail_from,
-                                       ip=classb, count=1, totscore=score)
+                                       ip=classb, count=1, totscore=score,
+                                       signedby=dkim_domain)
                 self.session.add(record)
 
 def checkSpamassassin(message, max_len, host=None):

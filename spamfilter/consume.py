@@ -51,6 +51,11 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
             message['From'] or message['Return-Path'])[1].lower()
         query = self.session.query(AutoWhitelist)
         query = query.filter_by(email=mail_from)
+        dkim_domain = getDKIMDomain(message, self.original_message)
+        if dkim_domain and not isDKIMVerified(self.original_message):
+            dkim_domain = ''
+
+        query = query.filter_by(signedby=dkim_domain)
         processed_classbs = {}
         for ip in ips:
             classb = '.'.join(ip.split('.')[:2])
@@ -63,5 +68,6 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
                 record.totscore += record.count * 1000
             else:
                 record = AutoWhitelist(username='GLOBAL', email=mail_from,
-                                       ip=classb, count=1, totscore=1000)
+                                       ip=classb, count=1, totscore=1000,
+                                       signedby=dkim_domain)
                 self.session.add(record)
