@@ -66,8 +66,3 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
             record = query.filter_by(ip=classb).first()
             if record:
                 record.totscore += record.count * 1000
-            else:
-                record = AutoWhitelist(username='GLOBAL', email=mail_from,
-                                       ip=classb, count=1, totscore=1000,
-                                       signedby=dkim_domain)
-                self.session.add(record)
