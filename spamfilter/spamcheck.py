@@ -125,7 +125,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
     def checkSpam(self, message):
         # Check the message and accept it if it is not spam.
         max_len = self.getConfigItem('spamfilter', 'max_message_length')
-        score, required, tests = checkSpamassassin(message, max_len)
+        score, required, tests = self.checkSpamassassin(message, max_len)
 
         # SpamAssassin does not deal well with some message character sets,
         # causing some tests to fire incorrectly. The spam score is adjusted
@@ -266,53 +266,58 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                                        signedby=dkim_domain)
                 self.session.add(record)
 
-def checkSpamassassin(message, max_len, host=None):
-    command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
-    if host:
-        command.extend(['-d', host])
-        
-    spamc = Popen(command, shell=False, stdin=PIPE, stdout=PIPE)
-    spamc.stdin.write(message)
-    spamc.stdin.close()
-    output = []
-    while True:
-        line = spamc.stdout.readline()
-        if line == '':
-            exit_code = spamc.wait()
-            break
+    def checkSpamassassin(self, message, max_len, host=None):
+        command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
+        if host:
+            command.extend(['-d', host])
 
-        output.append(line.rstrip())
+        # Since Postfix does not prepend a Return-Path: header to the message
+        # until it has delivered it to a mailbox we have to synthesise a
+        # Return-Path: header here so that the SpamAssassin tests that depend on
+        # it will fire.
+        spamc = Popen(command, shell=False, stdin=PIPE, stdout=PIPE)
+        spamc.stdin.write('Return-Path: <%s>\n' % (self.bounce or ''))
+        spamc.stdin.write(message)
+        spamc.stdin.close()
+        output = []
+        while True:
+            line = spamc.stdout.readline()
+            if line == '':
+                exit_code = spamc.wait()
+                break
 
-    if exit_code != 0:
-        raise Exception('spamc returned exit code %s' % exit_code)
+            output.append(line.rstrip())
 
-    # Extract the score, and determine tests that fired from the output of
-    # spamc.
-    score, required = [float(x) for x in output.pop(0).split('/')]
-    pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
-    continuation = re.compile(r'^\s*\b([^\r\n]*)')
-    tests = []
-    seen = False
-    for line in output:
-        if not seen and line.startswith('Content analysis details'):
-            seen = True
-            continue
-        elif seen:
-            match = pattern.search(line)
-            if match:
-                test_score, test, description = match.groups()
-                description = description.strip()
-                tests.append((test_score, test, description))
+        if exit_code != 0:
+            raise Exception('spamc returned exit code %s' % exit_code)
+
+        # Extract the score, and determine tests that fired from the output of
+        # spamc.
+        score, required = [float(x) for x in output.pop(0).split('/')]
+        pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
+        continuation = re.compile(r'^\s*\b([^\r\n]*)')
+        tests = []
+        seen = False
+        for line in output:
+            if not seen and line.startswith('Content analysis details'):
+                seen = True
                 continue
-
-            if tests:
-                match = continuation.search(line)
+            elif seen:
+                match = pattern.search(line)
                 if match:
-                    test_score, test, description = tests[-1]
-                    description += ' ' + match.group(1).strip()
-                    tests[-1] = (test_score, test, description)
+                    test_score, test, description = match.groups()
+                    description = description.strip()
+                    tests.append((test_score, test, description))
+                    continue
 
-    return score, required, tests
+                if tests:
+                    match = continuation.search(line)
+                    if match:
+                        test_score, test, description = tests[-1]
+                        description += ' ' + match.group(1).strip()
+                        tests[-1] = (test_score, test, description)
+
+        return score, required, tests
 
 def checkClamav(message, host, port, timeout):
     timeout = float(timeout)
