@@ -295,7 +295,6 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # spamc.
         score, required = [float(x) for x in output.pop(0).split('/')]
         pattern = re.compile(r'^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)')
-        continuation = re.compile(r'^\s*\b([^\r\n]*)')
         tests = []
         seen = False
         for line in output:
@@ -311,10 +310,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                     continue
 
                 if tests:
-                    match = continuation.search(line)
-                    if match:
+                    continuation = line.strip()
+                    if continuation:
                         test_score, test, description = tests[-1]
-                        description += ' ' + match.group(1).strip()
+                        description += ' ' + continuation
                         tests[-1] = (test_score, test, description)
 
         return score, required, tests
