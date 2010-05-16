@@ -38,19 +38,15 @@ class SpamTest(object):
         for k, v in kws.items():
             setattr(self, k, v)
 
-spamtest_table = Table(
-    'tests', meta,
-    Column('id', Integer, Sequence('tests_id_seq'), primary_key=True),
+spam_tests_table = Table(
+    'spam_tests', meta,
+    Column('id', Integer, Sequence('spam_tests_id_seq'), primary_key=True),
     Column('name', String(255), nullable=False),
     Column('description', TEXT, nullable=True),
-    Column('score', Float(precision='double'), nullable=False))
+    Column('score', Float(precision='double'), nullable=False),
+    Column('spam_id', Integer, ForeignKey('spam.id'), nullable=False))
 
-mapper(SpamTest, spamtest_table)
-
-spam_spamtest_table = Table(
-    'spam_tests', meta,
-    Column('spam_id', Integer, ForeignKey('spam.id'), nullable=False),
-    Column('test_id', Integer, ForeignKey('tests.id'), nullable=False))
+mapper(SpamTest, spam_tests_table)
 
 mapper(Spam, spam_table,
        properties={
@@ -60,8 +56,8 @@ mapper(Spam, spam_table,
                func.extract_header(text("'Subject'"),
                                    spam_table.c.contents).label('subject'),
                deferred=True),
-           'tests': relation(SpamTest, secondary=spam_spamtest_table)
+           'tests': relation(SpamTest, backref='spam')
        })
 
 __all__ = ['Spam', 'spam_table', 'SpamRecipient', 'spam_recipients_table',
-           'SpamTest', 'spamtest_table', 'spam_spamtest_table']
+           'SpamTest', 'spam_tests_table']

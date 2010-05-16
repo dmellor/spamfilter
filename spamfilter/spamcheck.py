@@ -176,7 +176,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # quarantined.
             spam = Spam(bounce=self.bounce, ip_address=self.remote_addr,
                         helo=self.remote_host, contents=message, score=score,
-                        tests=determineSpamTests(self.session, tests))
+                        tests=determineSpamTests(tests))
             recipients = self.getUniqueRecipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.add(spam)
@@ -342,37 +342,20 @@ def checkClamav(message, host, port, timeout):
     match = re.search(r'(\S+)\s+FOUND$', response)
     return match.group(1) if match else None
 
-def determineSpamTests(session, tests):
+def determineSpamTests(tests):
     scores, names, descriptions = zip(*tests)
     spam_tests = []
-    query = session.query(SpamTest)
     for i in range(len(names)):
         # Some of the more esoteric SpamAssassin tests do not have a
         # description, in which case spamc will report the description as being
         # equal to the test name. For such tests we create a SpamTest object
-        # with the description set to null if the test is a new test. If an
-        # existing test does not have a description but spamc now reports a
-        # description for it then we update the existing test.
-        spam_test = query.filter_by(name=names[i]).first()
-        if spam_test:
-            if (spam_test.description is None and
-                names[i] != descriptions[i]):
-                spam_test.description = descriptions[i]
-
-            # Update the test's score if the saved score differs from the
-            # reported score.
-            if spam_test.score != scores[i]:
-                spam_test.score = scores[i]
-
-            spam_tests.append(spam_test)
+        # with the description set to null.
+        if names[i] != descriptions[i]:
+            spam_tests.append(
+                SpamTest(name=names[i], description=descriptions[i],
+                         score=float(scores[i])))
         else:
-            if names[i] != descriptions[i]:
-                test = SpamTest(name=names[i], description=descriptions[i],
-                                score=float(scores[i]))
-            else:
-                test = SpamTest(name=names[i], score=float(scores[i]))
-
-            spam_tests.append(test)
+            spam_tests.append(SpamTest(name=names[i], score=float(scores[i])))
 
     return spam_tests
 

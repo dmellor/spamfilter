@@ -403,30 +403,32 @@ CREATE SEQUENCE spam_recipients_id_seq
 ALTER TABLE public.spam_recipients_id_seq OWNER TO david;
 
 --
+-- Name: spam_tests_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE spam_tests_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.spam_tests_id_seq OWNER TO david;
+
+--
 -- Name: spam_tests; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE TABLE spam_tests (
-    spam_id integer NOT NULL,
-    test_id integer NOT NULL
+    id integer DEFAULT nextval('spam_tests_id_seq'::regclass) NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    score double precision NOT NULL,
+    spam_id integer NOT NULL
 );
 
 
 ALTER TABLE public.spam_tests OWNER TO david;
-
---
--- Name: tests; Type: TABLE; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE TABLE tests (
-    id serial NOT NULL,
-    name character varying(255) NOT NULL,
-    description text,
-    score double precision NOT NULL
-);
-
-
-ALTER TABLE public.tests OWNER TO david;
 
 --
 -- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
@@ -563,11 +565,11 @@ ALTER TABLE ONLY spam_recipients
 
 
 --
--- Name: tests_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+-- Name: spam_tests_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
-ALTER TABLE ONLY tests
-    ADD CONSTRAINT tests_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY spam_tests
+    ADD CONSTRAINT spam_tests_pkey PRIMARY KEY (id);
 
 
 --
@@ -643,13 +645,6 @@ CREATE UNIQUE INDEX spam_recipients_delivery_id ON spam_recipients USING btree (
 
 
 --
--- Name: tests_name_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
---
-
-CREATE UNIQUE INDEX tests_name_index ON tests USING btree (name);
-
-
---
 -- Name: virus_recipients_delivery_id; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -710,14 +705,6 @@ ALTER TABLE ONLY spam_recipients
 
 ALTER TABLE ONLY spam_tests
     ADD CONSTRAINT spam_tests_spam_id_fkey FOREIGN KEY (spam_id) REFERENCES spam(id) ON DELETE CASCADE;
-
-
---
--- Name: spam_tests_test_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY spam_tests
-    ADD CONSTRAINT spam_tests_test_id_fkey FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE RESTRICT;
 
 
 --
@@ -859,6 +846,16 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients_id_seq TO qmail;
 
 
 --
+-- Name: spam_tests_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE spam_tests_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE spam_tests_id_seq FROM david;
+GRANT ALL ON TABLE spam_tests_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests_id_seq TO qmail;
+
+
+--
 -- Name: spam_tests; Type: ACL; Schema: public; Owner: david
 --
 
@@ -866,26 +863,6 @@ REVOKE ALL ON TABLE spam_tests FROM PUBLIC;
 REVOKE ALL ON TABLE spam_tests FROM david;
 GRANT ALL ON TABLE spam_tests TO david;
 GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests TO qmail;
-
-
---
--- Name: tests; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE tests FROM PUBLIC;
-REVOKE ALL ON TABLE tests FROM david;
-GRANT ALL ON TABLE tests TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE tests TO qmail;
-
-
---
--- Name: tests_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-REVOKE ALL ON TABLE tests_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE tests_id_seq FROM david;
-GRANT ALL ON TABLE tests_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE tests_id_seq TO qmail;
 
 
 --
