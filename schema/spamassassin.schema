@@ -189,8 +189,7 @@ declare
     result text;
 begin
     result := '''';
-    for test in select a.name from tests as a join spam_tests as b
-        on a.id = b.test_id where b.spam_id = id loop
+    for test in select name from spam_tests where spam_id = id loop
         result := result || '','' || test.name;
     end loop;
 
