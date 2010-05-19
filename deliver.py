@@ -120,9 +120,11 @@ def confirm(url, spam):
     print '<br><br>This message has been quarantined for the following %s:' % \
         reason
     print '<ul>'
+    seen = {}
     for test in spam.tests:
-        if test.description:
+        if test.description and test.description not in seen:
             print '<li>%s</li>' % test.description
+            seen[test.description] = True
 
     print '</ul>'
     print '<br>The contents of the message are:'
