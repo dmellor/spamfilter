@@ -56,7 +56,8 @@ mapper(Spam, spam_table,
                func.extract_header(text("'Subject'"),
                                    spam_table.c.contents).label('subject'),
                deferred=True),
-           'tests': relation(SpamTest, backref='spam')
+           'tests': relation(SpamTest, backref='spam',
+                             cascade='all, delete, delete-orphan')
        })
 
 __all__ = ['Spam', 'spam_table', 'SpamRecipient', 'spam_recipients_table',
