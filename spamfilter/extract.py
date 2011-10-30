@@ -11,8 +11,15 @@ class EmailExtractor(object):
         self.processMessage(email.message_from_string(self.original_message))
 
     def processMessage(self, message):
-        if message.get_content_type() == 'message/rfc822':
-            embedded = message.get_payload(0)
+        content_type = message.get_content_type()
+        filename = message.get_filename()
+        if content_type == 'message/rfc822' or (content_type == 'text/plain'
+                                                and filename == 'spam.txt'):
+            if content_type == 'message/rfc822':
+                embedded = message.get_payload(0)
+            else:
+                embedded = message
+
             if message['Content-Transfer-Encoding'] == 'base64':
                 self.original_message = base64.b64decode(embedded.get_payload())
                 embedded = email.message_from_string(self.original_message)
