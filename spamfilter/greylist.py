@@ -30,9 +30,10 @@ class GreylistPolicy(Policy):
 
         return self.greylist(rcpt_to, mail_from, ip_address, status)
 
-    def greylist(self, rcpt_to, mail_from, ip_address, status):
+    def greylist(self, rcpt_to, mail_from, classc, status):
+        classc = getClasscAddress(classc)
         instance = self.manager.get('instance')
-        record = self.getGreylistRecord(rcpt_to, mail_from, ip_address)
+        record = self.getGreylistRecord(rcpt_to, mail_from, classc)
         if record:
             if instance == record.last_instance:
                 # First check if the current message instance has already been
@@ -44,7 +45,7 @@ class GreylistPolicy(Policy):
                 # before the greylist policy in the configuration file.
                 return ACCEPTED
             elif ((record.accepted and not status.startswith(HARD_REJECTED)) or
-                  self.isAccepted(mail_from, rcpt_to, ip_address)):
+                  self.isAccepted(mail_from, rcpt_to, classc)):
                 record.last_instance = instance
                 record.successful += 1
                 return ACCEPTED
@@ -56,20 +57,20 @@ class GreylistPolicy(Policy):
         # The connection has not been seen before - create a new greylist
         # record if the status is not a hard rejection and the address is not
         # whitelisted.
-        if self.isAccepted(mail_from, rcpt_to, ip_address):
+        if self.isAccepted(mail_from, rcpt_to, classc):
             status = ACCEPTED
 
         if not status.startswith(HARD_REJECTED):
-            self.createGreylistRecord(rcpt_to, mail_from, ip_address, instance,
+            self.createGreylistRecord(rcpt_to, mail_from, classc, instance,
                                       status)
 
         return status
 
-    def getGreylistRecord(self, rcpt_to, mail_from, ip_address):
+    def getGreylistRecord(self, rcpt_to, mail_from, classc):
         # Load the record - this will be null if the tuple has not been seen
         # before.
         query = self.manager.session.query(self.greylist_class)
-        query = query.filter_by(ip_address=ip_address, mail_from=mail_from,
+        query = query.filter_by(ip_address=classc, mail_from=mail_from,
                                 rcpt_to=rcpt_to)
         return query.first()
 
@@ -80,13 +81,11 @@ class GreylistPolicy(Policy):
             mail_from = mail_from.lower()
 
         ip_address = self.manager.get('client_address')
-        ip_address = '.'.join(ip_address.split('.')[:3])
-
         return rcpt_to, mail_from, ip_address
 
-    def createGreylistRecord(self, rcpt_to, mail_from, ip_address, instance,
+    def createGreylistRecord(self, rcpt_to, mail_from, classc, instance,
                              status):
-        record = self.greylist_class(ip_address=ip_address, rcpt_to=rcpt_to,
+        record = self.greylist_class(ip_address=classc, rcpt_to=rcpt_to,
                                      mail_from=mail_from,
                                      last_instance=instance)
         if status == ACCEPTED:
@@ -96,9 +95,9 @@ class GreylistPolicy(Policy):
 
         self.manager.session.add(record)
 
-    def isAutoWhitelisted(self, mail_from, ip_address):
+    def isAutoWhitelisted(self, mail_from, classc):
         query = self.manager.session.query(AutoWhitelist)
-        classb = '.'.join(ip_address.split('.')[:2])
+        classb = '.'.join(classc.split('.')[:2])
         record = query.filter_by(email=mail_from, ip=classb).first()
         if record:
             threshold = int(self.manager.getConfigItem(
@@ -127,7 +126,10 @@ class GreylistPolicy(Policy):
         query = self.manager.session.query(SentMail)
         return query.filter_by(sender=recipient, recipient=mail_from).count()
 
-    def isAccepted(self, mail_from, rcpt_to, ip_address):
+    def isAccepted(self, mail_from, rcpt_to, classc):
         return (self.isWhitelisted(mail_from) or
-                self.isAutoWhitelisted(mail_from, ip_address) or
+                self.isAutoWhitelisted(mail_from, classc) or
                 self.isKnownCorrespondent(mail_from, rcpt_to))
+
+def getClasscAddress(ip_address):
+    return '.'.join(ip_address.split('.')[:3])
