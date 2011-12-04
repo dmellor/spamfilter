@@ -329,6 +329,34 @@ CREATE SEQUENCE quarantine_recipients_id_seq
 ALTER TABLE public.quarantine_recipients_id_seq OWNER TO david;
 
 --
+-- Name: received_mail; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE received_mail (
+    id serial NOT NULL,
+    email character varying(1024) NOT NULL,
+    ip_address character varying(15) NOT NULL,
+    is_spam boolean NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.received_mail OWNER TO david;
+
+--
+-- Name: received_mail_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE received_mail_id_seq
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.received_mail_id_seq OWNER TO david;
+
+--
 -- Name: sent_mail; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -616,6 +644,13 @@ CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (ip_address, mail_fro
 
 
 --
+-- Name: received_mail_email_is_spam; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE INDEX received_mail_email_is_spam ON received_mail USING btree (email, is_spam);
+
+
+--
 -- Name: sent_mail_index; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -782,6 +817,26 @@ REVOKE ALL ON TABLE quarantine_recipients FROM PUBLIC;
 REVOKE ALL ON TABLE quarantine_recipients FROM david;
 GRANT ALL ON TABLE quarantine_recipients TO david;
 GRANT SELECT ON TABLE quarantine_recipients TO qmail;
+
+
+--
+-- Name: received_mail; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE received_mail FROM PUBLIC;
+REVOKE ALL ON TABLE received_mail FROM david;
+GRANT ALL ON TABLE received_mail TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE received_mail TO qmail;
+
+
+--
+-- Name: received_mail_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE received_mail_id_seq FROM PUBLIC;
+REVOKE ALL ON TABLE received_mail_id_seq FROM david;
+GRANT ALL ON TABLE received_mail_id_seq TO david;
+GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE received_mail_id_seq TO qmail;
 
 
 --

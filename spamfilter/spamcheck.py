@@ -14,6 +14,7 @@ from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.model.sentmail import SentMail
 from spamfilter.model.autowhitelist import AutoWhitelist
+from spamfilter.model.receivedmail import ReceivedMail
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 VIRUS = '250 Message contains a virus and has been quarantined'
@@ -82,6 +83,12 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         err_status = None
         try:
             ok = self.performChecks(message)
+            if self.bounce:
+                received_mail = ReceivedMail(ip_address=self.remote_addr,
+                                             email=self.bounce.lower(),
+                                             is_spam=not ok)
+                self.session.add(received_mail)
+
             self.session.commit()
         except Exception, exc:
             self.session.rollback()
