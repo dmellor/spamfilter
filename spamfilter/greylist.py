@@ -1,6 +1,7 @@
 from spamfilter.model.greylist import createGreylistClass
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.sentmail import SentMail
+from spamfilter.model.receivedmail import ReceivedMail
 from spamfilter.policy import Policy, ACCEPTED
 from spamfilter.mixin import queryPostfixDB
 
@@ -97,6 +98,14 @@ class GreylistPolicy(Policy):
         self.manager.session.add(record)
 
     def isAutoWhitelisted(self, mail_from, ip_address):
+        # If the sender has recently sent any spam, then they are not considered
+        # to be auto-whitelisted.
+        query = self.manager.session.query(ReceivedMail)
+        if query.filter_by(email=mail_from, is_spam=True).count() != 0:
+            return False
+
+        # If the auto-whitelist score is below the threshold, then the sender is
+        # assumed to be auto-whitelisted.
         query = self.manager.session.query(AutoWhitelist)
         classb = '.'.join(ip_address.split('.')[:2])
         record = query.filter_by(email=mail_from, ip=classb).first()
