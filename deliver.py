@@ -52,17 +52,6 @@ class Deliver(ConfigMixin):
             raise
 
     def deliver(self, spam, spam_recipient):
-        # Determine the real recipient.
-        connection = self.session.connection()
-        statement = text(
-            'SELECT delivery FROM quarantine_recipients WHERE :x ~ regexp')
-        result = connection.execute(
-            statement, x=spam_recipient.recipient).fetchone()
-        if result:
-            recipient = result[0]
-        else:
-            recipient = spam_recipient.recipient
-
         # Retrieve the contents before deleting the message, as the contents
         # are deferred and cannot be retrieved after the deletion (SQLAlchemy
         # enters an infinite loop instead of throwing an exception).
@@ -102,7 +91,7 @@ class Deliver(ConfigMixin):
 
         # Deliver the message.
         mailServer = smtplib.SMTP('localhost')
-        mailServer.sendmail(spam.bounce, recipient, contents,
+        mailServer.sendmail(spam.bounce, spam_recipient.recipient, contents,
                             ['BODY=8BITMIME'])
         mailServer.quit()
         success()
