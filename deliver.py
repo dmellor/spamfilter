@@ -1,14 +1,9 @@
 #!/usr/bin/python2.6
 import os
 import sys
-import site
 import smtplib
 import email
 from email.utils import parseaddr
-
-deployment_dir = sys.path[0]
-site.addsitedir('%s/lib/python2.6/site-packages' % deployment_dir)
-
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.autowhitelist import AutoWhitelist
@@ -17,7 +12,7 @@ from sqlalchemy import text
 
 class Deliver(ConfigMixin):
     def __init__(self):
-        self.readConfig(os.path.join(deployment_dir, 'config.ini'))
+        self.readConfig('config.ini')
 
     def process(self):
         path_info = os.getenv('PATH_INFO')
