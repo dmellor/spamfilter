@@ -132,7 +132,12 @@ class SpamCheck(SmtpProxy, ConfigMixin):
     def checkSpam(self, message):
         # Check the message and accept it if it is not spam.
         max_len = self.getConfigItem('spamfilter', 'max_message_length')
-        score, required, tests = self.checkSpamassassin(message, max_len)
+        try:
+            score, required, tests = self.checkSpamassassin(message, max_len)
+        except Exception, exc:
+            error_message = re.sub(r'\r?\n', ' ', str(exc))
+            logging.info('spam check failed: %s', error_message)
+            return True
 
         # SpamAssassin does not deal well with some message character sets,
         # causing some tests to fire incorrectly. The spam score is adjusted
@@ -330,24 +335,29 @@ def checkClamav(message, host, port, timeout):
     port = int(port)
 
     # Open a socket to the CLAMAV daemon.
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host, port))
-    s.settimeout(timeout)
-    s.sendall('STREAM\n')
-    response = s.recv(1024)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((host, port))
+        s.settimeout(timeout)
+        s.sendall('STREAM\n')
+        response = s.recv(1024)
 
-    # Determine the port to connect to for the virus check.
-    port = re.search(r'PORT\s+(\d+)', response).group(1)
-    stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    stream.connect((host, int(port)))
-    stream.settimeout(timeout)
-    stream.sendall(message)
-    stream.close()
+        # Determine the port to connect to for the virus check.
+        port = re.search(r'PORT\s+(\d+)', response).group(1)
+        stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        stream.connect((host, int(port)))
+        stream.settimeout(timeout)
+        stream.sendall(message)
+        stream.close()
 
-    # Read the response from the server.
-    response = s.recv(1024)
-    match = re.search(r'(\S+)\s+FOUND$', response)
-    return match.group(1) if match else None
+        # Read the response from the server.
+        response = s.recv(1024)
+        match = re.search(r'(\S+)\s+FOUND$', response)
+        return match.group(1) if match else None
+    except Exception, exc:
+        error_message = re.sub(r'\r?\n', ' ', str(exc))
+        logging.info('virus check failed: %s', error_message)
+        return None
 
 def determineSpamTests(tests):
     scores, names, descriptions = zip(*tests)
