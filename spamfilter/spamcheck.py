@@ -378,15 +378,20 @@ def determineSpamTests(tests):
 
 def getCharsetFromMessage(message):
     charset = message.get_param('charset')
-    if not charset:
-        payload = message.get_payload()
-        if isinstance(payload, list):
-            for msg in payload:
-                charset = getCharsetFromMessage(msg)
-                if charset:
-                    charset = charset.lower()
-                    break
-    else:
-        charset = charset.lower()
+    try:
+        if not charset:
+            payload = message.get_payload()
+            if isinstance(payload, list):
+                for msg in payload:
+                    charset = getCharsetFromMessage(msg)
+                    if charset:
+                        charset = charset.lower()
+                        break
+        else:
+            charset = charset.lower()
+    except:
+        # If a charset could not be determined due to its declaration being
+        # malformed then return an empty charset.
+        return None
 
     return charset
