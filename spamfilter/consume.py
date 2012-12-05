@@ -1,6 +1,4 @@
 import email
-import base64
-import quopri
 from cStringIO import StringIO
 from email.generator import Generator
 from email.utils import parseaddr
@@ -15,6 +13,10 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
         self.readConfig(config)
         self.session = createSession(self.getConfigItem('database', 'dburi'))
         self.host = self.getConfigItem('spamfilter', 'host')
+
+    def reportSpam(self, filename):
+        message = ''.join(open(filename).readlines())
+        self.actOnMessage(email.message_from_string(message))
 
     def actOnMessage(self, message):
         try:
