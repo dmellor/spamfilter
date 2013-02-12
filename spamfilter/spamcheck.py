@@ -1,4 +1,3 @@
-import os
 from subprocess import *
 import socket
 import re
@@ -292,6 +291,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         spamc.stdin.write(message)
         spamc.stdin.close()
         output = []
+        exit_code = 0
         while True:
             line = spamc.stdout.readline()
             if line == '':
