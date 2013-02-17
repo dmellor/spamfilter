@@ -76,6 +76,15 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             if queryPostfixDB(whitelist_db, self.remote_host):
                 return True
 
+            # If there is only a single recipient, then check if the recipient
+            # is whitelisted. This is mainly to prevent bounce messages to a
+            # dedicated bounce address from being flagged as spam, as automated
+            # bounce messages can often trigger SpamAssassin's rules.
+            recipients = self.getUniqueRecipients()
+            if len(recipients) == 1:
+                if queryPostfixDB(whitelist_db, recipients[0].lower()):
+                    return True
+
         # The client is an external client - perform the spam and virus checks.
         message = ''.join(message)
         ok = False
