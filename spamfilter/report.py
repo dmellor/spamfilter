@@ -26,7 +26,7 @@ class ReportGenerator(ConfigMixin):
         self.template = Template(
             filename=os.path.join(os.path.dirname(__file__), 'report.txt'),
             input_encoding='utf-8', output_encoding='utf-8')
-        
+
     def report(self):
         # Retrieve the addresses to which a quarantine message should be sent.
         connection = self.session.connection()

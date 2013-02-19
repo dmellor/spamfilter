@@ -40,7 +40,7 @@ def main(user, password):
 
             if obj.created < retained_obj.created:
                 retained_obj.created = obj.created
-                
+
             session.delete(obj)
         else:
             retained[wrapper] = obj

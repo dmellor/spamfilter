@@ -103,10 +103,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             err_status = re.sub(r'\r?\n', ' ', str(exc))
             logging.info('spamcheck failed: %s', err_status)
             logging.info(traceback.format_exc())
-                           
+
         if err_status:
             self.error_response = "451 %s" % err_status
-            
+
         return ok
 
     def performChecks(self, message):
@@ -240,7 +240,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         recips = {}
         for recip in self.rcpt_to:
             recips[recip] = 1
-        
+
         return recips.keys()
 
     def isSentMail(self):

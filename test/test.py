@@ -54,7 +54,7 @@ def readResponse(smtp):
         if not output:
             print 'Process exited'
             sys.exit(0)
-            
+
         print output.strip()
         if not more_input.search(output):
             break

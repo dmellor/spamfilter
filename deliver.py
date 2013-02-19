@@ -203,7 +203,7 @@ def invalidId():
     print "<html><head><title>Invalid Message ID</title></head>"
     print "<body><h2>An invalid message id was specified.</h2></body></html>"
     sys.exit()
-    
+
 def success():
     print "Content-Type: text/html"
     print

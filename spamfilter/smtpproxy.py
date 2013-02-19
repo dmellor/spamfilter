@@ -32,14 +32,14 @@ class SmtpProxy(netcmd.NetCommand):
         self.error_response = None
         self.input = input
         self.output = output
-        
+
         # Open a connection to the remote server.
         self.openConnection()
 
         # Send the initial greeting response from the second server to the
         # first server.
         self.sendResponse()
-    
+
     def openConnection(self):
         # Create the connection to the remote server and get the file
         # descriptor from it.
@@ -52,7 +52,7 @@ class SmtpProxy(netcmd.NetCommand):
             line = self.input.readline()
             if line == '':
                 break
-            
+
             command = line.split()
             if command[0] == 'XFORWARD':
                 self.xforward(command)
@@ -65,7 +65,7 @@ class SmtpProxy(netcmd.NetCommand):
                 self.sendCommandAndResponse(command)
             elif command[0] == 'DATA':
                 self.data(command)
-                
+
                 # Reset the attributes in case more than one message is being
                 # processed.
                 self.rcpt_to = []
@@ -75,7 +75,7 @@ class SmtpProxy(netcmd.NetCommand):
                 self.error_response = None
             else:
                 self.sendCommandAndResponse(command)
-        
+
     def sendCommandAndResponse(self, command):
         processed = False
         if self.closed:
@@ -99,12 +99,12 @@ class SmtpProxy(netcmd.NetCommand):
         if not processed:
             self.command(command)
             self.sendResponse()
-    
+
     def sendResponse(self, discard=False):
         self.response()
         if not discard:
             self.printResponse()
-    
+
     def printResponse(self):
         # Get the response. NetCommand strips the code from each line and
         # replaces the \r\n sequences at the end of the line with a bare
@@ -113,13 +113,13 @@ class SmtpProxy(netcmd.NetCommand):
         def reformat(line):
             line = line.rstrip('\n')
             return '-%s\r\n' % line
-        
+
         message = [reformat(x) for x in message]
         message[-1] = re.sub('^-', ' ', message[-1])
         code = self.code()
         self.output.writelines(['%s%s' % (code, x) for x in message])
         self.output.flush()
-    
+
     def xforward(self, command):
         # Extract the remote IP address and hostname and save them for logging
         # purposes.
@@ -131,14 +131,14 @@ class SmtpProxy(netcmd.NetCommand):
                     self.remote_addr = match.group(2)
                 else:
                     self.remote_host = match.group(2).lower()
-    
+
     def data(self, command):
         self.command(command)
         cmd_status = self.response()
         self.printResponse()
         if cmd_status != netcmd.CMD_MORE:
             return
-        
+
         # Read the email message, converting \r\n sequences to \n and
         # converting lines that begin with two periods to a single period.
         message = []
@@ -152,14 +152,14 @@ class SmtpProxy(netcmd.NetCommand):
             line = self.input.readline()
             if line == '':
                 return
-            
+
             if eol_regexp.search(line):
                 break
-            
+
             line = convert_regexp.sub('\n', line)
             line = doubledot_regexp.sub('.', line)
             message.append(line)
-        
+
         # Check the message.
         if self.checkMessage(message):
             # The message passed the check, so send it to the second server.
@@ -177,7 +177,7 @@ class SmtpProxy(netcmd.NetCommand):
             response = re.sub(r'\r?\n?$', '\r\n', self.error_response)
             self.output.write(response)
             self.output.flush()
-    
+
     def dataSend(self, message):
         # NetCommand has a bug in its datasend method, as it does not clear the
         # previous response, This causes the response from the dataend method
@@ -186,14 +186,14 @@ class SmtpProxy(netcmd.NetCommand):
         # data.
         self.setStatus('000', [])
         super(SmtpProxy, self).dataSend(message)
-        
+
     def checkMessage(self, message):
         """
         This method should be overridden in a subclass to perform the checking
         operation.
         """
         return True
-    
+
     def mail(self, command):
         addr_regexp = re.compile('<(.*)>')
         for token in command[1:]:
@@ -204,7 +204,7 @@ class SmtpProxy(netcmd.NetCommand):
                     self.bounce = address
 
                 return
-    
+
     def rcpt(self, command):
         addr_regexp = re.compile('<(.*)>')
         for token in command[1:]:

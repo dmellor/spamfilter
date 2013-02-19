@@ -24,15 +24,15 @@ class NetCommand(object):
     functionality required for a command-based protocol, for example FTP and
     SMTP.
     """
-    
+
     def __init__(self, fp):
         """
         Constructor for a NetCommand obect. The fp argument should be a
         file-like object that supports two methods:
-        
+
         fileno() - returns the file descriptor associated with the file
         close() - closes the file
-        
+
         The Python file and socket objects are compatible with this class.
         """
         self.open(fp)
@@ -61,9 +61,9 @@ class NetCommand(object):
         oldval = getattr(self, 'net_cmd_debug', 0)
         if level is not None:
             self.net_cmd_debug = level
-        
+
         return oldval
-    
+
     def debugText(self, out, text):
         """
         This method is called to print debugging information. text is the text
@@ -84,16 +84,16 @@ class NetCommand(object):
             sys.stderr.write('>>> %s' % self.debugText(out, text))
         else:
             sys.stderr.write('<<< %s' % self.debugText(out, text))
-        
+
         sys.stderr.flush()
 
     def timeout(self):
         return None
-    
+
     def message(self):
         "Returns the text message returned from the last command."
         return self.net_cmd_resp
-    
+
     def code(self):
         """
         Returns the 3-digit code from the last command as a string. If a
@@ -101,23 +101,23 @@ class NetCommand(object):
         """
         if not hasattr(self, 'net_cmd_code'):
             self.net_cmd_code = '000'
-            
+
         return self.net_cmd_code
-    
+
     def status(self):
         """
         Returns the most significant digit of the current status code. If a
         command is pending then CMD_PENDING is returned.
         """
         return int(self.net_cmd_code[0])
-    
+
     def setStatus(self, code, resp):
         if not isinstance(resp, list):
             resp = [resp]
-            
+
         self.net_cmd_code = code
         self.net_cmd_resp = resp
-        
+
     def command(self, args):
         """
         Sends a command to the command server. All arguments are first joined
@@ -129,32 +129,32 @@ class NetCommand(object):
         except:
             self.setStatus('599', 'Connection closed')
             return
-            
+
         if hasattr(self, 'net_cmd_last_ch'):
             self.dataEnd()
-            
+
         if args:
             cmd = ' '.join([x.replace('\n', ' ') for x in args])
             cmd += '\015\012'
-            
+
             try:
                 bytes = os.write(fd, cmd)
             except:
                 bytes = None
-            
+
             if bytes is None or bytes != len(cmd):
                 try:
                     self.close()
                 except:
                     pass
-            
+
             if self.debug():
                 self.debugPrint(1, cmd)
-                
+
             # Clear the response and set a fictitious response code.
             self.net_cmd_resp = []
             self.net_cmd_code = '000'
-    
+
     def ok(self):
         """
         Returns True if the last code value was greater than zero and less than
@@ -163,7 +163,7 @@ class NetCommand(object):
         """
         code = int(self.code())
         return code > 0 and code < 400
-    
+
     def unsupported(self):
         """
         Sets the status code to 580 and the response text to
@@ -171,7 +171,7 @@ class NetCommand(object):
         """
         self.net_cmd_resp = ['Unsupported command']
         self.net_cmd_code = '580'
-        
+
     def getline(self):
         """
         Retrieves one line, delimited by CRLF, from the remote server.
@@ -182,10 +182,10 @@ class NetCommand(object):
         """
         if not hasattr(self, 'net_cmd_lines'):
             self.net_cmd_lines = []
-            
+
         if self.net_cmd_lines:
             return self.net_cmd_lines.pop(0)
-        
+
         partial = getattr(self, 'net_cmd_partial', '')
         fd = self.fp.fileno()
         while not self.net_cmd_lines:
@@ -195,7 +195,7 @@ class NetCommand(object):
                 if buf == '':
                     if self.debug():
                         carp('Unexpected EOF on command channel')
-                        
+
                     self.close()
                     return None
 
@@ -207,19 +207,19 @@ class NetCommand(object):
             else:
                 if self.debug():
                     carp('Timeout')
-                    
+
                 return None
-            
+
         self.net_cmd_partial = partial
         return self.net_cmd_lines.pop(0)
-    
+
     def ungetline(self, line):
         "Ungets a line of text from the server."
         if not hasattr(self, 'net_cmd_lines'):
             self.net_cmd_lines = []
-            
+
         self.net_cmd_lines.insert(0, line)
-        
+
     def parseResponse(self, line):
         """
         This method is called by response as a method with one argument. It
@@ -232,7 +232,7 @@ class NetCommand(object):
             return match.group(3), match.group(1), match.group(2) == '-'
         else:
             return line, None, False
-        
+
     def response(self):
         """
         Obtains a response from the server. Upon success the most significant
@@ -241,26 +241,26 @@ class NetCommand(object):
         """
         if not hasattr(self, 'net_cmd_resp'):
             self.net_cmd_resp = []
-        
+
         more = True
         while more:
             line = self.getline()
             if line is None:
                 return CMD_ERROR
-            
+
             if self.debug():
                 self.debugPrint(0, line)
-            
+
             line, code, more = self.parseResponse(line)
             if code is None:
                 self.ungetline(line)
                 break
-            
+
             self.net_cmd_code = code
             self.net_cmd_resp.append(line)
 
         return int(code[0])
-    
+
     def readUntilDot(self, fp=None):
         """
         Reads data from the remote server until a line consisting of a single
@@ -275,21 +275,21 @@ class NetCommand(object):
             line = self.getline()
             if line is None:
                 return None
-            
+
             if self.debug() & 4:
                 self.debugPrint(0, line)
-            
+
             match = dotend_pattern.search(line)
             if match:
                 break
-            
+
             if fp:
                 os.write(fp.fileno(), line)
             else:
                 array.append(line)
-                
+
         return array
-    
+
     def dataSend(self, lines):
         """
         Sends data to the remote server, converting LF to CRLF. Any line
@@ -300,19 +300,19 @@ class NetCommand(object):
             fd = self.fp.fileno()
         except:
             return 0
-        
+
         last_ch = getattr(self, 'net_cmd_last_ch', None)
         if last_ch is None:
             last_ch = '\012'
             self.net_cmd_last_ch = last_ch
-            
+
         if len(line) == 0:
             return 1
-        
+
         if self.debug():
             for b in re.split(r'\n', line):
                 self.debugPrint(1, b + '\n')
-        
+
         if '\r' != '\015':
             line = line.replace('\r\n', '\015\012')
 
@@ -323,7 +323,7 @@ class NetCommand(object):
         elif last_ch == '\012':
             if line.find('.') == 0:
                 first_ch = '.'
-        
+
         line = first_ch + re.sub(r'\015?\012(\.?)', r'\015\012\1\1', line)
         self.net_cmd_last_ch = line[-1]
         num_bytes = len(line)
@@ -336,19 +336,19 @@ class NetCommand(object):
                 except Exception, exc:
                     if self.debug():
                         carp(str(exc))
-                        
+
                     return None
-                
+
                 num_bytes -= bytes_written
                 offset += bytes_written
             else:
                 if self.debug():
                     carp('Timeout')
-                    
+
                 return None
-            
+
         return 1
-    
+
     def rawDataSend(self, lines):
         "Sends data to the remote server without performing any conversions."
         line = ''.join(lines)
@@ -356,17 +356,17 @@ class NetCommand(object):
             fd = self.fp.fileno()
         except:
             return 0
-        
+
         num_bytes = len(line)
         if num_bytes == 0:
             return 1
-        
+
         if self.debug():
             sys.stderr.write('>>> ')
             sys.stderr.write('\n>>> '.join(re.split(r'\n', line)))
             sys.stderr.write('\n')
             sys.stderr.flush()
-        
+
         offset = 0
         while num_bytes:
             output = select([], [fd], [], self.timeout())[1]
@@ -376,19 +376,19 @@ class NetCommand(object):
                 except Exception, exc:
                     if self.debug():
                         carp(str(exc))
-                        
+
                     return None
-                
+
                 num_bytes -= bytes_written
                 offset += bytes_written
             else:
                 if self.debug():
                     carp('Timeout')
-                    
+
                 return None
-            
+
         return 1
-    
+
     def dataEnd(self):
         """
         Ends the sending of data to the remote server. This is done by ensuring
@@ -400,21 +400,21 @@ class NetCommand(object):
             fd = self.fp.fileno()
         except:
             return 0
-        
+
         tosend = ''
         ch = getattr(self, 'net_cmd_last_ch', None)
         if ch is None:
             return 1
         elif ch != '\012':
             tosend = '\015\012'
-            
+
         tosend += '.\015\012'
-        
+
         if self.debug():
             self.debugPrint(1, '.\n')
-        
+
         os.write(fd, tosend)
         if hasattr(self, 'net_cmd_last_ch'):
             del self.net_cmd_last_ch
-            
+
         return self.response() == CMD_OK

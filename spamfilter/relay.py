@@ -23,7 +23,7 @@ class Relay(SmtpProxy, ConfigMixin):
     def xforward(self, command):
         # Ensure that the remote_addr attribute is set.
         super(Relay, self).xforward(command)
-        
+
         # Gather the attributes of the XFORWARD command, stripping out the
         # SOURCE attribute, as the XCLIENT command does not support it.
         source_index = -1
