@@ -1,4 +1,3 @@
-import sys
 import email
 import base64
 import quopri

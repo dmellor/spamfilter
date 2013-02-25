@@ -55,6 +55,7 @@ class PolicyManager(ConfigMixin):
                 self.values = {}
 
     def determineAction(self):
+        action = err_status = None
         retries = 0
         num_retries = int(self.getConfigItem('general', 'retries', 2))
         while retries < num_retries:

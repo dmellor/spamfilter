@@ -10,8 +10,8 @@ import codecs
 from email.header import decode_header
 
 from spamfilter.mixin import ConfigMixin, createSession
-from spamfilter.model.spam import Spam, SpamRecipient, spam_recipients_table
-from spamfilter.model.virus import Virus, VirusRecipient, virus_recipients_table
+from spamfilter.model.spam import SpamRecipient, spam_recipients_table
+from spamfilter.model.virus import VirusRecipient, virus_recipients_table
 from mako.template import Template
 
 class MessageSummary(object):

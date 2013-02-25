@@ -7,7 +7,6 @@ from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.report import translate
-from sqlalchemy import text
 
 class Deliver(ConfigMixin):
     def __init__(self):
@@ -143,6 +142,7 @@ def getBodyTypeCharset(message):
     payload = message.get_payload()
     content_type = message.get_content_type()
     charset = message.get_param('charset')
+    body = None
     if not isinstance(payload, list):
         if content_type in ('text/plain', 'text/html'):
             body = payload
@@ -154,8 +154,6 @@ def getBodyTypeCharset(message):
             elif transfer_encoding == 'base64':
                 import base64
                 body = base64.b64decode(body)
-        else:
-            body = None
     else:
         for msg in payload:
             body, content_type, charset = getBodyTypeCharset(msg)

@@ -1,4 +1,5 @@
-import sys, re
+import sys
+import re
 import email
 from email.mime.text import MIMEText
 from email.mime.message import MIMEMessage
@@ -58,7 +59,7 @@ def generate_bounce(spam, sender):
     report['Content-Description'] = 'Delivery report'
     contents = MIMEMessage(spam)
     contents['Content-Description'] = 'Undelivered Message'
-    _params={'report-type': 'delivery-status'}
+    _params = {'report-type': 'delivery-status'}
     message = MIMEMultipart('report', **_params)
     message.attach(notification)
     message.attach(report)
@@ -104,6 +105,7 @@ class FileBouncer(EmailExtractor):
         bounce(message)
 
 from spamfilter.mixin import *
+
 class DbBouncer(ConfigMixin):
     def __init__(self, config):
         self.readConfig(config)
@@ -111,6 +113,7 @@ class DbBouncer(ConfigMixin):
 
     def bounceFromId(self, spam_id):
         from spamfilter.model.spam import Spam
+
         spam = self.session.query(Spam).get(spam_id)
         spam_message = email.message_from_string(spam.contents)
         bounce(spam_message, spam.bounce)

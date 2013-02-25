@@ -25,7 +25,7 @@ class NetCommand(object):
     SMTP.
     """
 
-    def __init__(self, fp):
+    def __init__(self, fp=None):
         """
         Constructor for a NetCommand obect. The fp argument should be a
         file-like object that supports two methods:
@@ -35,7 +35,8 @@ class NetCommand(object):
 
         The Python file and socket objects are compatible with this class.
         """
-        self.open(fp)
+        if not fp:
+            self.open(fp)
 
     def open(self, fp):
         self.fp = fp
@@ -63,7 +64,6 @@ class NetCommand(object):
             self.net_cmd_debug = level
 
         return oldval
-
     def debugText(self, out, text):
         """
         This method is called to print debugging information. text is the text
@@ -138,11 +138,11 @@ class NetCommand(object):
             cmd += '\015\012'
 
             try:
-                bytes = os.write(fd, cmd)
+                cmd_bytes = os.write(fd, cmd)
             except:
-                bytes = None
+                cmd_bytes = None
 
-            if bytes is None or bytes != len(cmd):
+            if cmd_bytes is None or cmd_bytes != len(cmd):
                 try:
                     self.close()
                 except:
@@ -162,7 +162,7 @@ class NetCommand(object):
         not hold may override this method.
         """
         code = int(self.code())
-        return code > 0 and code < 400
+        return 0 < code < 400
 
     def unsupported(self):
         """
@@ -200,7 +200,7 @@ class NetCommand(object):
                     return None
 
                 # Prepend the last data read and then break into lines.
-                buf = partial + buf
+                buf += partial
                 buf = re.split(r'\015?\012', buf)
                 partial = buf.pop(len(buf) - 1)
                 self.net_cmd_lines.extend([x + '\n' for x in buf])

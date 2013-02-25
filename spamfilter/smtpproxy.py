@@ -21,8 +21,10 @@ class SmtpProxy(netcmd.NetCommand):
     to quarantine the message if it is identified as spam or if it contains a
     virus.
     """
-    def __init__(self, input=sys.stdin, output=sys.stdout, host='localhost',
-                 port=25):
+
+    def __init__(self, smtp_input=sys.stdin, smtp_output=sys.stdout,
+                 host='localhost', port=25):
+        super(SmtpProxy, self).__init__()
         self.host = host
         self.port = port
         self.rcpt_to = []
@@ -30,14 +32,11 @@ class SmtpProxy(netcmd.NetCommand):
         self.remote_addr = None
         self.remote_host = None
         self.error_response = None
-        self.input = input
-        self.output = output
 
         # Open a connection to the remote server.
+        self.input = smtp_input
+        self.output = smtp_output
         self.openConnection()
-
-        # Send the initial greeting response from the second server to the
-        # first server.
         self.sendResponse()
 
     def openConnection(self):
@@ -110,6 +109,7 @@ class SmtpProxy(netcmd.NetCommand):
         # replaces the \r\n sequences at the end of the line with a bare
         # linefeed.
         message = self.message()
+
         def reformat(line):
             line = line.rstrip('\n')
             return '-%s\r\n' % line

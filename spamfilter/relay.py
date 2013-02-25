@@ -65,6 +65,7 @@ class Relay(SmtpProxy, ConfigMixin):
             # in which case we send the XCLIENT command, discard the response
             # and then send the synthesised HELO command and discard its
             # response before issuing the mail command.
+            name = None
             send_commands = True
             pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
             if pop_db and queryPostfixDB(pop_db, self.remote_addr):
