@@ -64,6 +64,7 @@ class NetCommand(object):
             self.net_cmd_debug = level
 
         return oldval
+
     def debugText(self, out, text):
         """
         This method is called to print debugging information. text is the text

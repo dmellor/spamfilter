@@ -38,9 +38,9 @@ mapper(Virus, viruses_table,
            'recipients': relation(VirusRecipient, backref='virus'),
            'contents': deferred(viruses_table.c.contents),
            'subject': column_property(
-                func.extract_header(text("'Subject'"),
-                                    viruses_table.c.contents).label('subject'),
-                deferred=True)
+               func.extract_header(text("'Subject'"),
+                                   viruses_table.c.contents).label('subject'),
+               deferred=True)
        })
 
 __all__ = ['Virus', 'viruses_table', 'VirusRecipient',
