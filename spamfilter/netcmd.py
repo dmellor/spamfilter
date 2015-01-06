@@ -201,7 +201,7 @@ class NetCommand(object):
                     return None
 
                 # Prepend the last data read and then break into lines.
-                buf += partial
+                buf = partial + buf
                 buf = re.split(r'\015?\012', buf)
                 partial = buf.pop(len(buf) - 1)
                 self.net_cmd_lines.extend([x + '\n' for x in buf])
