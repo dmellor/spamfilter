@@ -138,5 +138,8 @@ class GreylistPolicy(Policy):
 
     def isAccepted(self, mail_from, rcpt_to, ip_address):
         return (self.isWhitelisted(mail_from) or
-                self.isAutoWhitelisted(mail_from, ip_address) or
+                (bool(self.manager.getConfigItem('greylist',
+                                                 'use_autowhitelist',
+                                                 True)) and
+                 self.isAutoWhitelisted(mail_from, ip_address)) or
                 self.isKnownCorrespondent(mail_from, rcpt_to))
