@@ -1,13 +1,18 @@
 import re
 from subprocess import *
 
+Session = None
+
+
 class ConfigMixin(object):
-    def readConfig(self, config_file):
+    # noinspection PyAttributeOutsideInit
+    def read_config(self, config_file):
         from ConfigParser import ConfigParser
+
         self.config = ConfigParser()
         self.config.read(config_file)
 
-    def getConfigItem(self, *args):
+    def get_config_item(self, *args):
         section, name = args[:2]
         try:
             return self.config.get(section, name)
@@ -17,18 +22,18 @@ class ConfigMixin(object):
             else:
                 raise
 
-    def getConfigItemList(self, section, name):
-        item = self.getConfigItem(section, name, [])
+    def get_config_item_list(self, section, name):
+        item = self.get_config_item(section, name, [])
         if type(item) is str:
             item = [x.strip() for x in item.split(',')]
 
         return item
 
-Session = None
 
-def createSession(dburi, serializable=True):
+def create_session(dburi, serializable=True):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+
     global Session
     if not Session:
         Session = sessionmaker()
@@ -42,9 +47,11 @@ def createSession(dburi, serializable=True):
     session.commit()
     return session
 
-def queryPostfixDB(db, item):
+
+def query_postfix_db(db, item):
     if item:
         from subprocess import Popen, PIPE
+
         postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
         line = postmap.stdout.readline()
         postmap.wait()
@@ -52,7 +59,8 @@ def queryPostfixDB(db, item):
     else:
         return False
 
-def getReceivedIPsAndHelo(message, host):
+
+def get_received_ips_and_helo(message, host):
     received = message.get_all('Received')
     from_re = re.compile(r'^from\s+(\S+)')
     ips = []
@@ -70,12 +78,13 @@ def getReceivedIPsAndHelo(message, host):
 
                 # Find all of the IP addresses on the received line.
                 for match in re.finditer(
-                    r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\D', line):
+                        r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\D', line):
                     ips.append(match.group(1))
 
     return ips, helo
 
-def getDKIMDomain(message_object, original_message):
+
+def get_dkim_domain(message_object, original_message):
     header1 = message_object.get_all('DKIM-Signature', [None])[0]
     header2 = message_object.get_all('DomainKey-Signature', [None])[0]
     if header1 and header2:
@@ -94,7 +103,8 @@ def getDKIMDomain(message_object, original_message):
 
     return domain
 
-def isDKIMVerified(original_message):
+
+def is_dkim_verified(original_message):
     # We use the Perl Mail::DKIM::Verifier package, as this is the same code
     # that is used by SpamAssassin. There is currently no adequate pure Python
     # solution for verifying DKIM signatures, as pydkim is buggy and sometimes

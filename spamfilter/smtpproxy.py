@@ -4,6 +4,7 @@ import re
 
 import spamfilter.netcmd as netcmd
 
+
 class SmtpProxy(netcmd.NetCommand):
     """
     This class can be used to implement an after-queue content filter for
@@ -36,17 +37,17 @@ class SmtpProxy(netcmd.NetCommand):
         # Open a connection to the remote server.
         self.input = smtp_input
         self.output = smtp_output
-        self.openConnection()
-        self.sendResponse()
+        self.open_connection()
+        self.send_response()
 
-    def openConnection(self):
+    def open_connection(self):
         # Create the connection to the remote server and get the file
         # descriptor from it.
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((self.host, self.port))
         self.open(s)
 
-    def processMessage(self):
+    def process_message(self):
         while True:
             line = self.input.readline()
             if line == '':
@@ -55,13 +56,13 @@ class SmtpProxy(netcmd.NetCommand):
             command = line.split()
             if command[0] == 'XFORWARD':
                 self.xforward(command)
-                self.sendCommandAndResponse(command)
+                self.send_command_and_response(command)
             elif command[0] == 'MAIL':
                 self.mail(command)
-                self.sendCommandAndResponse(command)
+                self.send_command_and_response(command)
             elif command[0] == 'RCPT':
                 self.rcpt(command)
-                self.sendCommandAndResponse(command)
+                self.send_command_and_response(command)
             elif command[0] == 'DATA':
                 self.data(command)
 
@@ -73,9 +74,9 @@ class SmtpProxy(netcmd.NetCommand):
                 self.remote_host = None
                 self.error_response = None
             else:
-                self.sendCommandAndResponse(command)
+                self.send_command_and_response(command)
 
-    def sendCommandAndResponse(self, command):
+    def send_command_and_response(self, command):
         processed = False
         if self.closed:
             # If this point is reached then another message is being sent to
@@ -85,10 +86,10 @@ class SmtpProxy(netcmd.NetCommand):
             # QUIT, then we simply send a fake '221 Bye' response back to the
             # first server.
             if command[0] != 'QUIT':
-                self.openConnection()
-                self.sendResponse(discard=True)
+                self.open_connection()
+                self.send_response(discard=True)
                 self.command(['EHLO', 'localhost'])
-                self.sendResponse(discard=True)
+                self.send_response(discard=True)
             else:
                 self.output.write('221 Bye\r\n')
                 self.output.flush()
@@ -97,14 +98,14 @@ class SmtpProxy(netcmd.NetCommand):
         # Send the command and its response.
         if not processed:
             self.command(command)
-            self.sendResponse()
+            self.send_response()
 
-    def sendResponse(self, discard=False):
+    def send_response(self, discard=False):
         self.response()
         if not discard:
-            self.printResponse()
+            self.print_response()
 
-    def printResponse(self):
+    def print_response(self):
         # Get the response. NetCommand strips the code from each line and
         # replaces the \r\n sequences at the end of the line with a bare
         # linefeed.
@@ -135,7 +136,7 @@ class SmtpProxy(netcmd.NetCommand):
     def data(self, command):
         self.command(command)
         cmd_status = self.response()
-        self.printResponse()
+        self.print_response()
         if cmd_status != netcmd.CMD_MORE:
             return
 
@@ -161,14 +162,14 @@ class SmtpProxy(netcmd.NetCommand):
             message.append(line)
 
         # Check the message.
-        if self.checkMessage(message):
+        if self.check_message(message):
             # The message passed the check, so send it to the second server.
             # The dataend method calls the response method, so the response
             # message can be sent to the first server immediately after calling
             # dataend.
-            self.dataSend(message)
-            self.dataEnd()
-            self.printResponse()
+            self.data_send(message)
+            self.data_end()
+            self.print_response()
         else:
             # The message did not pass the check. The connection to the second
             # server is closed immediately, and an error response is sent back
@@ -178,16 +179,16 @@ class SmtpProxy(netcmd.NetCommand):
             self.output.write(response)
             self.output.flush()
 
-    def dataSend(self, message):
+    def data_send(self, message):
         # NetCommand has a bug in its datasend method, as it does not clear the
         # previous response, This causes the response from the dataend method
         # to be garbled, as it contains the previous response prepended to it.
         # We override the method here to clear the response before sending the
         # data.
-        self.setStatus('000', [])
-        super(SmtpProxy, self).dataSend(message)
+        self.set_status('000', [])
+        super(SmtpProxy, self).data_send(message)
 
-    def checkMessage(self, message):
+    def check_message(self, message):
         """
         This method should be overridden in a subclass to perform the checking
         operation.

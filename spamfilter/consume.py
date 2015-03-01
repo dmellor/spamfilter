@@ -4,33 +4,34 @@ from email.generator import Generator
 from email.utils import parseaddr
 from spamfilter.model.spam import Spam
 from spamfilter.model.autowhitelist import AutoWhitelist
-from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.greylist import create_greylist_class
 from spamfilter.mixin import *
 from spamfilter.extract import EmailExtractor
 
+
 class SpamConsumer(EmailExtractor, ConfigMixin):
     def __init__(self, config):
-        self.readConfig(config)
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
-        self.host = self.getConfigItem('spamfilter', 'host')
+        self.read_config(config)
+        self.session = create_session(self.get_config_item('database', 'dburi'))
+        self.host = self.get_config_item('spamfilter', 'host')
 
-    def reportSpam(self, filename):
+    def report_spam(self, filename):
         message = ''.join(open(filename).readlines())
-        self.actOnMessage(email.message_from_string(message))
+        self.act_on_message(email.message_from_string(message))
 
-    def actOnMessage(self, message):
+    def act_on_message(self, message):
         try:
-            self.saveSpam(message)
+            self.save_spam(message)
             self.session.commit()
         except:
             self.session.rollback()
             raise
 
-    def saveSpam(self, message):
+    def save_spam(self, message):
         # Extract the attached message and save it in the spam table.
         bounce = parseaddr(message['Return-Path'] or message['From'])[1]
         mail_from = bounce.lower() if bounce else None
-        ips, helo = getReceivedIPsAndHelo(message, self.host)
+        ips, helo = get_received_ips_and_helo(message, self.host)
         fp = StringIO()
         g = Generator(fp, mangle_from_=False)
         g.flatten(message)
@@ -39,7 +40,7 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
         self.session.add(spam)
 
         # Remove the greylist entry.
-        query = self.session.query(createGreylistClass())
+        query = self.session.query(create_greylist_class())
         recipient = message.get_all('X-Original-To')[0]
         classc = '.'.join(ips[0].split('.')[:3])
         query = query.filter_by(rcpt_to=recipient, mail_from=mail_from,

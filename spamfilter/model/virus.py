@@ -2,10 +2,12 @@ from sqlalchemy import *
 from sqlalchemy.orm import *
 from spamfilter.model import meta
 
+
 class Virus(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 viruses_table = Table(
     'viruses', meta,
@@ -17,10 +19,12 @@ viruses_table = Table(
     Column('virus', TEXT, nullable=False),
     Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
+
 class VirusRecipient(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 virus_recipients_table = Table(
     'virus_recipients', meta,

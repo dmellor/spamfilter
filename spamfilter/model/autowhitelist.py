@@ -4,10 +4,12 @@ from sqlalchemy import *
 from sqlalchemy.orm import *
 from spamfilter.model import meta
 
+
 class AutoWhitelist(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 auto_whitelist_table = Table(
     'auto_whitelist', meta,

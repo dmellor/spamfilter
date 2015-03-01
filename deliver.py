@@ -8,18 +8,20 @@ from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.report import translate
 
+
 class Deliver(ConfigMixin):
     def __init__(self):
-        self.readConfig('config.ini')
+        self.read_config('config.ini')
 
+    # noinspection PyAttributeOutsideInit
     def process(self):
         path_info = os.getenv('PATH_INFO')
         if path_info[0] != '/':
-            invalidId()
+            invalid_id()
 
         delivery_id = path_info[1:]
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
-        self.host = self.getConfigItem('spamfilter', 'host')
+        self.session = create_session(self.get_config_item('database', 'dburi'))
+        self.host = self.get_config_item('spamfilter', 'host')
         try:
             method = os.getenv('REQUEST_METHOD')
             if method != 'GET' and method != 'POST':
@@ -29,7 +31,7 @@ class Deliver(ConfigMixin):
                 delivery_id=delivery_id)
             spam_recipient = query.first()
             if not spam_recipient:
-                invalidId()
+                invalid_id()
 
             spam = self.session.query(Spam).get(spam_recipient.spam_id)
             if method == 'GET':
@@ -44,6 +46,7 @@ class Deliver(ConfigMixin):
             self.session.rollback()
             raise
 
+    # noinspection PyShadowingNames
     def deliver(self, spam, spam_recipient):
         # Retrieve the contents before deleting the message, as the contents
         # are deferred and cannot be retrieved after the deletion (SQLAlchemy
@@ -72,7 +75,7 @@ class Deliver(ConfigMixin):
         mail_from = parseaddr(
             message['From'] or message['Return-Path'])[1].lower()
         query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
-        ips, helo = getReceivedIPsAndHelo(message, self.host)
+        ips, helo = get_received_ips_and_helo(message, self.host)
         processed_classbs = {}
         for ip in ips:
             classb = '.'.join(ip.split('.')[:2])
@@ -83,11 +86,12 @@ class Deliver(ConfigMixin):
                     record.totscore -= adjustment
 
         # Deliver the message.
-        mailServer = smtplib.SMTP('localhost')
-        mailServer.sendmail(spam.bounce, spam_recipient.recipient, contents,
-                            ['BODY=8BITMIME'])
-        mailServer.quit()
+        mail_server = smtplib.SMTP('localhost')
+        mail_server.sendmail(spam.bounce, spam_recipient.recipient, contents,
+                             ['BODY=8BITMIME'])
+        mail_server.quit()
         success()
+
 
 def confirm(url, spam):
     print 'Content-Type: text/html; charset=utf-8'
@@ -112,16 +116,17 @@ def confirm(url, spam):
     print '<br>The contents of the message are:'
     print '</font>'
     print '<table border="1"><tr>'
-    print '<td><pre>%s</pre></td>' % extractMessageBody(spam.contents)
+    print '<td><pre>%s</pre></td>' % extract_message_body(spam.contents)
     print '</tr></table>'
     print '<h2>Click the button to deliver the message to your mailbox.</h2>'
     print '<form method="POST" enctype="application/x-www-form-urlencoded"'
     print 'action="%s"' % url, '>'
     print '<input type="submit" value="Deliver message"></form></body></html>'
 
-def extractMessageBody(contents):
+
+def extract_message_body(contents):
     message = email.message_from_string(contents)
-    body, content_type, charset = getBodyTypeCharset(message)
+    body, content_type, charset = get_body_type_charset(message)
     if charset:
         body = body.decode(charset).encode('utf8')
 
@@ -136,9 +141,10 @@ def extractMessageBody(contents):
         body = ''.join(lynx.stdout.readlines())
         lynx.wait()
 
-    return fixLongParagraphs(body)
+    return fix_long_paragraphs(body)
 
-def getBodyTypeCharset(message):
+
+def get_body_type_charset(message):
     payload = message.get_payload()
     content_type = message.get_content_type()
     charset = message.get_param('charset')
@@ -156,13 +162,14 @@ def getBodyTypeCharset(message):
                 body = base64.b64decode(body)
     else:
         for msg in payload:
-            body, content_type, charset = getBodyTypeCharset(msg)
+            body, content_type, charset = get_body_type_charset(msg)
             if body:
                 break
 
     return body, content_type, charset
 
-def fixLongParagraphs(body):
+
+def fix_long_paragraphs(body):
     from textwrap import TextWrapper
     wrapper = TextWrapper(width=120, break_long_words=False)
     lines = body.splitlines()
@@ -195,12 +202,14 @@ def fixLongParagraphs(body):
 
     return '\n'.join(modified_lines)
 
-def invalidId():
+
+def invalid_id():
     print "Content-Type: text/html"
     print
     print "<html><head><title>Invalid Message ID</title></head>"
     print "<body><h2>An invalid message id was specified.</h2></body></html>"
     sys.exit()
+
 
 def success():
     print "Content-Type: text/html"

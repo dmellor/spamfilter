@@ -3,6 +3,7 @@ import re
 from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
 
+
 class Relay(SmtpProxy, ConfigMixin):
     """
     This class is used to relay mail from a backup MX server to the primary MX
@@ -13,9 +14,10 @@ class Relay(SmtpProxy, ConfigMixin):
     access controls on the primary MX server to process the same client
     information as was seen by the backup MX server.
     """
+
     def __init__(self, config, **kws):
         super(Relay, self).__init__(**kws)
-        self.readConfig(config)
+        self.read_config(config)
         self.xclient_command = ['XCLIENT']
         self.xclient_helo = None
         self.xclient_name = None
@@ -48,7 +50,7 @@ class Relay(SmtpProxy, ConfigMixin):
         self.xclient_helo = None
         self.xclient_name = None
 
-    def sendCommandAndResponse(self, command):
+    def send_command_and_response(self, command):
         # Because more than one XFORWARD command can be sent but only a single
         # XCLIENT command can be sent, the XCLIENT command is not sent until
         # the MAIL command is about to be sent, and therefore a synthesised
@@ -67,8 +69,8 @@ class Relay(SmtpProxy, ConfigMixin):
             # response before issuing the mail command.
             name = None
             send_commands = True
-            pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
-            if pop_db and queryPostfixDB(pop_db, self.remote_addr):
+            pop_db = self.get_config_item('spamfilter', 'pop_db', None)
+            if pop_db and query_postfix_db(pop_db, self.remote_addr):
                 send_commands = False
             else:
                 name = self.xclient_helo or self.xclient_name
@@ -77,10 +79,10 @@ class Relay(SmtpProxy, ConfigMixin):
 
             if send_commands:
                 self.command(self.xclient_command)
-                self.sendResponse(discard=True)
+                self.send_response(discard=True)
                 self.command(['HELO', name])
-                self.sendResponse(discard=True)
+                self.send_response(discard=True)
 
-            super(Relay, self).sendCommandAndResponse(command)
+            super(Relay, self).send_command_and_response(command)
         else:
-            super(Relay, self).sendCommandAndResponse(command)
+            super(Relay, self).send_command_and_response(command)

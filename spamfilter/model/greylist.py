@@ -18,8 +18,8 @@ greylist_table = Table(
     UniqueConstraint('ip_address', 'mail_from', 'rcpt_to',
                      name='greylist_tuple'))
 
-def createGreylistClass(interval=None):
 
+def create_greylist_class(interval=None):
     class Greylist(object):
         def __init__(self, **kws):
             for k, v in kws.items():
@@ -33,10 +33,11 @@ def createGreylistClass(interval=None):
                                % interval),
                     whens=[('true', 1)],
                     else_=0).label('accepted'))
-            })
+        })
     else:
         mapper(Greylist, greylist_table)
 
     return Greylist
 
-__all__ = ['createGreylistClass', 'greylist_table']
+
+__all__ = ['create_greylist_class', 'greylist_table']

@@ -3,13 +3,16 @@ import base64
 import quopri
 import re
 
+
 class EmailExtractor(object):
+    # noinspection PyAttributeOutsideInit
     def process(self, fp):
         self.original_message = ''.join(fp.readlines())
         self.processed = False
-        self.processMessage(email.message_from_string(self.original_message))
+        self.process_message(email.message_from_string(self.original_message))
 
-    def processMessage(self, message):
+    # noinspection PyAttributeOutsideInit
+    def process_message(self, message):
         content_type = message.get_content_type()
         filename = message.get_filename()
         if content_type == 'message/rfc822' or (content_type == 'text/plain'
@@ -56,11 +59,12 @@ class EmailExtractor(object):
 
                 self.original_message = '\n'.join(lines[start + 1:])
 
-            self.actOnMessage(embedded)
+            self.act_on_message(embedded)
             self.processed = True
         elif 'attachment' in (message['Content-Disposition'] or ''):
             self.original_message = message.get_payload()
-            self.actOnMessage(email.message_from_string(self.original_message))
+            self.act_on_message(
+                email.message_from_string(self.original_message))
             self.processed = True
         else:
             payload = message.get_payload()
@@ -69,8 +73,8 @@ class EmailExtractor(object):
                 self.index = 1
                 for p in payload:
                     if not self.processed:
-                        self.processMessage(p)
+                        self.process_message(p)
                         self.index += 1
 
-    def actOnMessage(self, message):
+    def act_on_message(self, message):
         raise Exception('Implementation not found')

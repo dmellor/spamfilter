@@ -3,9 +3,9 @@ import re
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from spamfilter.model.auto_whitelist import AutoWhitelist
-from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.greylist import create_greylist_class
 
-Greylist = createGreylistClass()
+Greylist = create_greylist_class()
 
 def filter(from_session, to_session, cls, func, *unique_fields):
     from_query = from_session.query(cls)

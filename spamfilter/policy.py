@@ -2,23 +2,26 @@ import re
 import sys
 import time
 import logging
-from spamfilter.mixin import ConfigMixin, createSession
+from spamfilter.mixin import ConfigMixin, create_session
 
 ACCEPTED = 'dunno'
+
 
 class PolicyManager(ConfigMixin):
     def __init__(self, config):
         self.values = {}
-        self.readConfig(config)
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
-        self.loadPolicies()
+        self.read_config(config)
+        self.session = create_session(self.get_config_item('database', 'dburi'))
+        self.load_policies()
 
-    def loadPolicies(self):
+    # noinspection PyAttributeOutsideInit
+    def load_policies(self):
         self.policies = []
         num = 0
         while True:
             num += 1
-            class_name = self.getConfigItem('policies', 'policy%s' % num, None)
+            class_name = self.get_config_item('policies', 'policy%s' % num,
+                                              None)
             if not class_name:
                 break
 
@@ -44,7 +47,7 @@ class PolicyManager(ConfigMixin):
                 name, value = match.groups()
                 self.values[name] = value
             else:
-                action, err_status = self.determineAction()
+                action, err_status = self.determine_action()
                 if err_status:
                     err_status = re.sub('\n', '_', err_status)
                     sys.stdout.write('action=451 %s\n\n' % err_status)
@@ -54,16 +57,16 @@ class PolicyManager(ConfigMixin):
                 sys.stdout.flush()
                 self.values = {}
 
-    def determineAction(self):
+    def determine_action(self):
         action = err_status = None
         retries = 0
-        num_retries = int(self.getConfigItem('general', 'retries', 2))
+        num_retries = int(self.get_config_item('general', 'retries', 2))
         while retries < num_retries:
             action = ACCEPTED
             err_status = None
             try:
                 for policy in self.policies:
-                    action = policy.processRequest()
+                    action = policy.process_request()
                     if action != ACCEPTED:
                         break
 
@@ -74,15 +77,16 @@ class PolicyManager(ConfigMixin):
                 err_status = str(exc)
                 logging.info('policy failed: %s', err_status)
                 retries += 1
-                wait_time = int(self.getConfigItem('general', 'wait', 5))
+                wait_time = int(self.get_config_item('general', 'wait', 5))
                 logging.info('sleeping for %s seconds', wait_time)
                 time.sleep(wait_time)
 
         return action, err_status
 
+
 class Policy(object):
     def __init__(self, manager):
         self.manager = manager
 
-    def processRequest(self):
+    def process_request(self):
         raise Exception('Implementation not found')

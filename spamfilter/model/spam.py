@@ -2,10 +2,12 @@ from sqlalchemy import *
 from sqlalchemy.orm import *
 from spamfilter.model import meta
 
+
 class Spam(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 spam_table = Table(
     'spam', meta,
@@ -17,10 +19,12 @@ spam_table = Table(
     Column('score', Float(precision='double'), nullable=False),
     Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
+
 class SpamRecipient(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 spam_recipients_table = Table(
     'spam_recipients', meta,
@@ -33,10 +37,12 @@ spam_recipients_table = Table(
 
 mapper(SpamRecipient, spam_recipients_table)
 
+
 class SpamTest(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 spam_tests_table = Table(
     'spam_tests', meta,

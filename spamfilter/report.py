@@ -9,24 +9,27 @@ from sqlalchemy import select, text
 import codecs
 from email.header import decode_header
 
-from spamfilter.mixin import ConfigMixin, createSession
+from spamfilter.mixin import ConfigMixin, create_session
 from spamfilter.model.spam import SpamRecipient, spam_recipients_table
 from spamfilter.model.virus import VirusRecipient, virus_recipients_table
 from mako.template import Template
+
 
 class MessageSummary(object):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
 
+
 class ReportGenerator(ConfigMixin):
     def __init__(self, config):
-        self.readConfig(config)
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.read_config(config)
+        self.session = create_session(self.get_config_item('database', 'dburi'))
         self.template = Template(
             filename=os.path.join(os.path.dirname(__file__), 'report.txt'),
             input_encoding='utf-8', output_encoding='utf-8')
 
+    # noinspection PyComparisonWithNone
     def report(self):
         # Retrieve the addresses to which a quarantine message should be sent.
         connection = self.session.connection()
@@ -47,13 +50,13 @@ class ReportGenerator(ConfigMixin):
         # Send a quarantine report to each recipient. Each report is generated
         # and sent out within a single database transaction, and we make two
         # attempts per user to send the report before giving up.
-        host = self.getConfigItem('report', 'host')
+        host = self.get_config_item('report', 'host')
         random.seed()
         for recipient in recipients:
             attempt = 0
             while attempt < 2:
                 try:
-                    self.sendQuarantineReport(recipient, host)
+                    self.send_quarantine_report(recipient, host)
                     self.session.commit()
                     break
                 except Exception, exc:
@@ -64,7 +67,7 @@ class ReportGenerator(ConfigMixin):
                               (recipient, exc)
                     time.sleep(5)
 
-    def sendQuarantineReport(self, recipient, host):
+    def send_quarantine_report(self, recipient, host):
         # Determine the real recipient.
         connection = self.session.connection()
         query = text(
@@ -75,12 +78,12 @@ class ReportGenerator(ConfigMixin):
         # Create the message summaries for this recipient's spam and viruses.
         query = self.session.query(SpamRecipient)
         query = query.filter_by(recipient=recipient, delivery_id=None)
-        spam = createMessageSummaries([x.spam for x in query.all()],
-                                      recipient)
+        spam = create_message_summaries([x.spam for x in query.all()],
+                                        recipient)
         query = self.session.query(VirusRecipient)
         query = query.filter_by(recipient=recipient, delivery_id=None)
-        viruses = createMessageSummaries([x.virus for x in query.all()],
-                                         recipient)
+        viruses = create_message_summaries([x.virus for x in query.all()],
+                                           recipient)
 
         # Extract the domain name from the recipient and determine the name of
         # the mail server.
@@ -96,21 +99,23 @@ class ReportGenerator(ConfigMixin):
             recipient=recipient, rfcdate=rfc822str(cur_date),
             subject_date=cur_date.strftime("%m/%d/%Y %I:%M %p"), spam=spam,
             viruses=viruses)
-        mailServer = smtplib.SMTP('localhost')
+        mail_server = smtplib.SMTP('localhost')
         sender = 'do_not_reply@%s' % domain
-        mailServer.sendmail(sender, actual_recipient, msg_text,
-                            ['BODY=8BITMIME'])
-        mailServer.quit()
+        mail_server.sendmail(sender, actual_recipient, msg_text,
+                             ['BODY=8BITMIME'])
+        mail_server.quit()
 
-def createMessageSummaries(messages, recipient):
+
+def create_message_summaries(messages, recipient):
     # Order the messages by date, and then create a summary of each message.
-    messages.sort(key=lambda x: x.created)
+    messages.sort(key=lambda msg: msg.created)
     return [MessageSummary(bounce=x.bounce, subject=translate(x.subject),
                            date=x.created.replace(microsecond=0),
-                           delivery_id=createDeliveryId(x, recipient))
+                           delivery_id=create_delivery_id(x, recipient))
             for x in messages]
 
-def createDeliveryId(message, recipient):
+
+def create_delivery_id(message, recipient):
     digest = hashlib.md5()
 
     # The MAIL FROM header can be null, if the spam was impersonating a bounce
@@ -132,28 +137,30 @@ def createDeliveryId(message, recipient):
 
     return delivery_id
 
+
 # This function tries to convert the text to Unicode. If that fails, then an
 # ascii-encoded string will be returned.
-def translate(text):
-    text = _translate(text)
+def translate(txt):
+    txt = _translate(txt)
 
     # Some email headers are incorrectly encoded. If the text was not encoded
     # according to RFC 2047, then we attempt to decode it to Unicode assuming
     # that the encoding is utf8. If that fails then we convert the text to
     # ascii encoding by deleting all non-ascii characters from the text.
-    if not isinstance(text, unicode):
+    if not isinstance(txt, unicode):
         try:
-            text = text.decode('utf8')
+            txt = txt.decode('utf8')
         except:
-            text = ''.join([x for x in text if ord(x) < 128])
+            txt = ''.join([x for x in txt if ord(x) < 128])
 
-    return text
+    return txt
+
 
 # Transform the text according to RFC 2047.
-def _translate(text):
-    if text:
+def _translate(txt):
+    if txt:
         try:
-            chunks = decode_header(text)
+            chunks = decode_header(txt)
             translated = []
             for chunk in chunks:
                 if chunk[1]:
@@ -163,9 +170,9 @@ def _translate(text):
 
             return u''.join(translated)
         except:
-            return text
+            return txt
     else:
         # If the text was None, it is converted to an empty string in order to
         # prevent 'NoneType' object is not iterable when the return value of
         # this function is treated as a string.
-        return '' if text is None else text
+        return '' if txt is None else txt

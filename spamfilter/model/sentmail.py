@@ -2,11 +2,13 @@ from sqlalchemy import *
 from sqlalchemy.orm import *
 from spamfilter.model import meta
 
+
 class SentMail(object):
     def __init__(self, messages=1, **kws):
         self.messages = messages
         for k, v in kws.items():
             setattr(self, k, v)
+
 
 sent_mail_table = Table(
     'sent_mail', meta,

@@ -10,7 +10,7 @@ from spamfilter.smtpproxy import SmtpProxy
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient, SpamTest
 from spamfilter.model.virus import Virus, VirusRecipient
-from spamfilter.model.greylist import createGreylistClass
+from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.sentmail import SentMail
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.receivedmail import ReceivedMail
@@ -20,69 +20,69 @@ VIRUS = '250 Message contains a virus and has been quarantined'
 
 Greylist = None
 
+
 class DisabledCharsetTests(object):
     def __init__(self, value):
         charset, tests = value.split(None, 1)
         self.charset = charset.lower()
         self.tests = tests.split()
 
+
 class SpamCheck(SmtpProxy, ConfigMixin):
     """
     This class checks a message against spamd for spam and clamd for viruses.
     """
+
     def __init__(self, config, **kws):
         global Greylist
         super(SpamCheck, self).__init__(**kws)
-        self.readConfig(config)
-        self.session = createSession(
-            self.getConfigItem('database', 'dburi'), serializable=False)
-        Greylist = createGreylistClass(
-            self.getConfigItem('greylist', 'interval', 30))
-        self.trusted_ips = self.getConfigItemList('sent_mail', 'trusted_ips')
-        self.pop_db = self.getConfigItem('spamfilter', 'pop_db', None)
-        self.host = self.getConfigItem('spamfilter', 'host')
-        self.getDisabledCharsetTests()
-
-    def getDisabledCharsetTests(self):
+        self.read_config(config)
+        self.session = create_session(
+            self.get_config_item('database', 'dburi'), serializable=False)
+        Greylist = create_greylist_class(
+            self.get_config_item('greylist', 'interval', 30))
+        self.trusted_ips = self.get_config_item_list('sent_mail', 'trusted_ips')
+        self.pop_db = self.get_config_item('spamfilter', 'pop_db', None)
+        self.host = self.get_config_item('spamfilter', 'host')
         self.disabled_tests = []
         num = 0
         while True:
             num += 1
-            value = self.getConfigItem(
+            value = self.get_config_item(
                 'spamfilter', 'charset_disabled_tests%s' % num, None)
             if not value:
                 break
 
             self.disabled_tests.append(DisabledCharsetTests(value))
 
-    def checkMessage(self, message):
+    def check_message(self, message):
         # If the sender is whitelisted then we do not want to perform any
         # checks. This is to prevent quarantining mail that SpamAssassin
         # consistently and incorrectly flags as spam.
-        whitelist_db = self.getConfigItem('spamfilter', 'whitelist_db', None)
+        whitelist_db = self.get_config_item('spamfilter', 'whitelist_db', None)
         if whitelist_db:
             if self.bounce:
                 # First check the full address.
                 mail_from = self.bounce.lower()
-                if queryPostfixDB(whitelist_db, mail_from):
+                if query_postfix_db(whitelist_db, mail_from):
                     return True
 
                 # Check the domain.
                 domain = mail_from.index('@') + 1
-                if queryPostfixDB(whitelist_db, mail_from[domain:]):
+                if query_postfix_db(whitelist_db, mail_from[domain:]):
                     return True
 
             # Check if the HELO string is whitelisted.
-            if queryPostfixDB(whitelist_db, self.remote_host):
+            if query_postfix_db(whitelist_db, self.remote_host):
                 return True
 
             # If there is only a single recipient, then check if the recipient
             # is whitelisted. This is mainly to prevent bounce messages to a
             # dedicated bounce address from being flagged as spam, as automated
             # bounce messages can often trigger SpamAssassin's rules.
-            recipients = self.getUniqueRecipients()
+            recipients = self.get_unique_recipients()
             if len(recipients) == 1:
-                if queryPostfixDB(whitelist_db, recipients[0].lower()):
+                if query_postfix_db(whitelist_db, recipients[0].lower()):
                     return True
 
         # The client is an external client - perform the spam and virus checks.
@@ -90,7 +90,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         ok = False
         err_status = None
         try:
-            ok = self.performChecks(message)
+            ok = self.perform_checks(message)
             if self.bounce:
                 received_mail = ReceivedMail(ip_address=self.remote_addr,
                                              email=self.bounce.lower(),
@@ -109,18 +109,18 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return ok
 
-    def performChecks(self, message):
+    def perform_checks(self, message):
         # If the message if being sent from this host, then do not perform any
         # checks.
-        if self.isSentMail():
+        if self.is_sent_mail():
             return True
 
         # If the message is above a certain size, then automatically accept it.
-        max_len = int(self.getConfigItem('spamfilter', 'max_message_length'))
+        max_len = int(self.get_config_item('spamfilter', 'max_message_length'))
         if len(message) > max_len:
             return True
 
-        ok = self.checkSpam(message) and self.checkVirus(message)
+        ok = self.check_spam(message) and self.check_virus(message)
 
         # If the message is spam or contains a virus then we ensure that its
         # corresponding greylist entry, if any, is removed.
@@ -129,7 +129,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             query = self.session.query(Greylist)
             mail_from = self.bounce.lower() if self.bounce else None
             query = query.filter_by(mail_from=mail_from, ip_address=ip_address)
-            recipients = self.getUniqueRecipients()
+            recipients = self.get_unique_recipients()
             for recipient in recipients:
                 entry = query.filter_by(rcpt_to=recipient).first()
                 if entry:
@@ -137,11 +137,11 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return ok
 
-    def checkSpam(self, message):
+    def check_spam(self, message):
         # Check the message and accept it if it is not spam.
-        max_len = self.getConfigItem('spamfilter', 'max_message_length')
+        max_len = self.get_config_item('spamfilter', 'max_message_length')
         try:
-            score, required, tests = self.checkSpamassassin(message, max_len)
+            score, required, tests = self.check_spamassassin(message, max_len)
         except Exception, exc:
             error_message = re.sub(r'\r?\n', ' ', str(exc))
             logging.info('spam check failed: %s', error_message)
@@ -151,11 +151,11 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # causing some tests to fire incorrectly. The spam score is adjusted
         # here by disabling the problem tests if they have fired.
         msg_obj = email.message_from_string(message)
-        dkim_domain = getDKIMDomain(msg_obj, message)
-        if dkim_domain and not isDKIMVerified(message):
+        dkim_domain = get_dkim_domain(msg_obj, message)
+        if dkim_domain and not is_dkim_verified(message):
             dkim_domain = ''
 
-        charset = getCharsetFromMessage(msg_obj)
+        charset = get_charset_from_message(msg_obj)
         disabled_tests = [x.tests for x in self.disabled_tests
                           if x.charset == charset]
         if disabled_tests:
@@ -174,7 +174,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 # If the score needs to be adjusted then we must adjust
                 # the auto-whitelist scores that were updated by
                 # SpamAssassin.
-                ips, helo = getReceivedIPsAndHelo(msg_obj, self.host)
+                ips, helo = get_received_ips_and_helo(msg_obj, self.host)
                 mail_from = parseaddr(
                     msg_obj['From'] or msg_obj['Return-Path'])[1].lower()
                 query = self.session.query(AutoWhitelist)
@@ -196,8 +196,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # quarantined.
             spam = Spam(bounce=self.bounce, ip_address=self.remote_addr,
                         helo=self.remote_host, contents=message, score=score,
-                        tests=determineSpamTests(tests))
-            recipients = self.getUniqueRecipients()
+                        tests=determine_spam_tests(tests))
+            recipients = self.get_unique_recipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.add(spam)
 
@@ -207,25 +207,25 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # the AWL entry for the envelope header is below the spam threshold,
             # then this allows the message to avoid greylisting or blacklisting
             # in the policy check because it will pass the isAccepted method.
-            self.fixAWL(msg_obj, dkim_domain, score)
+            self.fix_awl(msg_obj, dkim_domain, score)
 
             # Set the error response to be written to the mail log.
             self.error_response = SPAM
 
         return ok
 
-    def checkVirus(self, message):
+    def check_virus(self, message):
         # Check the message against the ClamAV server.
-        host = self.getConfigItem('spamfilter', 'clamav_server', 'localhost')
-        port = self.getConfigItem('spamfilter', 'clamav_port', 3310)
-        timeout = self.getConfigItem('spamfilter', 'clamav_timeout', 30)
-        virus_type = checkClamav(message, host, port, timeout)
+        host = self.get_config_item('spamfilter', 'clamav_server', 'localhost')
+        port = self.get_config_item('spamfilter', 'clamav_port', 3310)
+        timeout = self.get_config_item('spamfilter', 'clamav_timeout', 30)
+        virus_type = check_clamav(message, host, port, timeout)
         if virus_type:
             # The message is a virus and must be quarantined.
             virus = Virus(bounce=self.bounce, helo=self.remote_host,
                           ip_address=self.remote_addr, contents=message,
                           virus=virus_type)
-            recipients = self.getUniqueRecipients()
+            recipients = self.get_unique_recipients()
             virus.recipients = [VirusRecipient(recipient=x)
                                 for x in recipients]
             self.session.add(virus)
@@ -236,25 +236,25 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         else:
             return True
 
-    def getUniqueRecipients(self):
+    def get_unique_recipients(self):
         recips = {}
         for recip in self.rcpt_to:
             recips[recip] = 1
 
         return recips.keys()
 
-    def isSentMail(self):
+    def is_sent_mail(self):
         # If the remote IP address is a trusted IP address or is in the POP
         # before SMTP table, then we do not want to perform any checks as this
         # is mail that is being sent from this host.
         is_sent_mail = self.remote_addr in self.trusted_ips
         if not is_sent_mail and self.pop_db:
-            is_sent_mail = queryPostfixDB(self.pop_db, self.remote_addr)
+            is_sent_mail = query_postfix_db(self.pop_db, self.remote_addr)
 
         if is_sent_mail and self.bounce:
             mail_from = self.bounce.lower()
             query = self.session.query(SentMail).filter_by(sender=mail_from)
-            recipients = self.getUniqueRecipients()
+            recipients = self.get_unique_recipients()
             for recipient in recipients:
                 record = query.filter_by(recipient=recipient).first()
                 if record:
@@ -265,7 +265,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return is_sent_mail
 
-    def fixAWL(self, message, dkim_domain, score):
+    def fix_awl(self, message, dkim_domain, score):
         # If the envelope sender is different from the address in the From:
         # header, then we update the AWL record for the envelope sender.
         header = parseaddr(
@@ -286,7 +286,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                                        signedby=dkim_domain)
                 self.session.add(record)
 
-    def checkSpamassassin(self, message, max_len, host=None):
+    def check_spamassassin(self, message, max_len, host=None):
         command = ['/usr/bin/spamc', '-R', '-x', '-s', str(max_len)]
         if host:
             command.extend(['-d', host])
@@ -339,7 +339,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return score, required, tests
 
-def checkClamav(message, host, port, timeout):
+
+def check_clamav(message, host, port, timeout):
     timeout = float(timeout)
     port = int(port)
 
@@ -368,7 +369,8 @@ def checkClamav(message, host, port, timeout):
         logging.info('virus check failed: %s', error_message)
         return None
 
-def determineSpamTests(tests):
+
+def determine_spam_tests(tests):
     scores, names, descriptions = zip(*tests)
     spam_tests = []
     for i in range(len(names)):
@@ -385,14 +387,15 @@ def determineSpamTests(tests):
 
     return spam_tests
 
-def getCharsetFromMessage(message):
+
+def get_charset_from_message(message):
     charset = message.get_param('charset')
     try:
         if not charset:
             payload = message.get_payload()
             if isinstance(payload, list):
                 for msg in payload:
-                    charset = getCharsetFromMessage(msg)
+                    charset = get_charset_from_message(msg)
                     if charset:
                         charset = charset.lower()
                         break

@@ -3,13 +3,16 @@ import re
 import sys
 from select import select
 
+
 def carp(text):
     import traceback
+
     stack = traceback.extract_stack()
     caller_frame = stack[-3]
     sys.stderr.write('%s:%s %s: %s' % (caller_frame[0], caller_frame[1],
                                        caller_frame[2], text))
     sys.stderr.flush()
+
 
 CMD_INFO = 1
 CMD_OK = 2
@@ -18,6 +21,8 @@ CMD_REJECT = 4
 CMD_ERROR = 5
 CMD_PENDING = 0
 
+
+# noinspection PyAttributeOutsideInit
 class NetCommand(object):
     """
     NetCommand is a class containing methods that implement the
@@ -65,34 +70,36 @@ class NetCommand(object):
 
         return oldval
 
-    def debugText(self, out, text):
+    # noinspection PyUnusedLocal,PyMethodMayBeStatic
+    def debug_text(self, out, text):
         """
         This method is called to print debugging information. text is the text
         being sent. The method should return the text to be printed. This is
         primarily meant for the use of modules such as FTP where passwords are
         sent, but we do not want to display them in the debugging information.
         """
-        dummy = out    
+        dummy = out
         return text
 
-    def debugPrint(self, out, text):
+    def debug_print(self, out, text):
         """
         Prints debugging information. out denotes the direction, with True
         being data being sent to the server. This method calls debugText
         before printing to STDERR.
         """
         if out:
-            sys.stderr.write('>>> %s' % self.debugText(out, text))
+            sys.stderr.write('>>> %s' % self.debug_text(out, text))
         else:
-            sys.stderr.write('<<< %s' % self.debugText(out, text))
+            sys.stderr.write('<<< %s' % self.debug_text(out, text))
 
         sys.stderr.flush()
 
+    # noinspection PyMethodMayBeStatic
     def timeout(self):
         return None
 
     def message(self):
-        "Returns the text message returned from the last command."
+        """Returns the text message returned from the last command."""
         return self.net_cmd_resp
 
     def code(self):
@@ -112,7 +119,7 @@ class NetCommand(object):
         """
         return int(self.net_cmd_code[0])
 
-    def setStatus(self, code, resp):
+    def set_status(self, code, resp):
         if not isinstance(resp, list):
             resp = [resp]
 
@@ -128,11 +135,11 @@ class NetCommand(object):
         try:
             fd = self.fp.fileno()
         except:
-            self.setStatus('599', 'Connection closed')
+            self.set_status('599', 'Connection closed')
             return
 
         if hasattr(self, 'net_cmd_last_ch'):
-            self.dataEnd()
+            self.data_end()
 
         if args:
             cmd = ' '.join([x.replace('\n', ' ') for x in args])
@@ -150,7 +157,7 @@ class NetCommand(object):
                     pass
 
             if self.debug():
-                self.debugPrint(1, cmd)
+                self.debug_print(1, cmd)
 
             # Clear the response and set a fictitious response code.
             self.net_cmd_resp = []
@@ -215,13 +222,14 @@ class NetCommand(object):
         return self.net_cmd_lines.pop(0)
 
     def ungetline(self, line):
-        "Ungets a line of text from the server."
+        """Ungets a line of text from the server."""
         if not hasattr(self, 'net_cmd_lines'):
             self.net_cmd_lines = []
 
         self.net_cmd_lines.insert(0, line)
 
-    def parseResponse(self, line):
+    # noinspection PyMethodMayBeStatic
+    def parse_response(self, line):
         """
         This method is called by response as a method with one argument. It
         should return an array of 2 values, the 3-digit status code and a flag
@@ -243,6 +251,7 @@ class NetCommand(object):
         if not hasattr(self, 'net_cmd_resp'):
             self.net_cmd_resp = []
 
+        code = None
         more = True
         while more:
             line = self.getline()
@@ -250,9 +259,9 @@ class NetCommand(object):
                 return CMD_ERROR
 
             if self.debug():
-                self.debugPrint(0, line)
+                self.debug_print(0, line)
 
-            line, code, more = self.parseResponse(line)
+            line, code, more = self.parse_response(line)
             if code is None:
                 self.ungetline(line)
                 break
@@ -262,7 +271,7 @@ class NetCommand(object):
 
         return int(code[0])
 
-    def readUntilDot(self, fp=None):
+    def read_until_dot(self, fp=None):
         """
         Reads data from the remote server until a line consisting of a single
         '.'. Any lines starting with '..' will have one of the '.'s removed.
@@ -278,7 +287,7 @@ class NetCommand(object):
                 return None
 
             if self.debug() & 4:
-                self.debugPrint(0, line)
+                self.debug_print(0, line)
 
             match = dotend_pattern.search(line)
             if match:
@@ -291,7 +300,7 @@ class NetCommand(object):
 
         return array
 
-    def dataSend(self, lines):
+    def data_send(self, lines):
         """
         Sends data to the remote server, converting LF to CRLF. Any line
         starting with a '.' will be prefixed with another '.'.
@@ -312,7 +321,7 @@ class NetCommand(object):
 
         if self.debug():
             for b in re.split(r'\n', line):
-                self.debugPrint(1, b + '\n')
+                self.debug_print(1, b + '\n')
 
         if '\r' != '\015':
             line = line.replace('\r\n', '\015\012')
@@ -350,8 +359,10 @@ class NetCommand(object):
 
         return 1
 
-    def rawDataSend(self, lines):
-        "Sends data to the remote server without performing any conversions."
+    def raw_data_send(self, lines):
+        """
+        Sends data to the remote server without performing any conversions.
+        """
         line = ''.join(lines)
         try:
             fd = self.fp.fileno()
@@ -390,7 +401,7 @@ class NetCommand(object):
 
         return 1
 
-    def dataEnd(self):
+    def data_end(self):
         """
         Ends the sending of data to the remote server. This is done by ensuring
         that the data already sent ends with CRLF then sending '.CRLF' to end
@@ -412,7 +423,7 @@ class NetCommand(object):
         tosend += '.\015\012'
 
         if self.debug():
-            self.debugPrint(1, '.\n')
+            self.debug_print(1, '.\n')
 
         os.write(fd, tosend)
         if hasattr(self, 'net_cmd_last_ch'):

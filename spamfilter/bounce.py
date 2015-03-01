@@ -40,6 +40,7 @@ Diagnostic-Code: x-unix; 550 5.2.1 Address unknown
 
 """
 
+
 def generate_bounce(spam, sender):
     del spam['Delivered-To']
     del spam['X-Original-To']
@@ -75,6 +76,7 @@ def generate_bounce(spam, sender):
     g.flatten(message)
     return fp.getvalue()
 
+
 def bounce_file():
     bouncer = FileBouncer()
     if len(sys.argv) == 1 or sys.argv[1] == '-':
@@ -83,11 +85,13 @@ def bounce_file():
         fp = open(sys.argv[1])
         bouncer.process(fp)
 
+
 def bounce_db():
     config = sys.argv[1]
     spam_id = int(sys.argv[2])
     bouncer = DbBouncer(config)
-    bouncer.bounceFromId(spam_id)
+    bouncer.bounce_from_id(spam_id)
+
 
 def bounce(spam, sender=None):
     if not sender:
@@ -100,18 +104,21 @@ def bounce(spam, sender=None):
     smtp.sendmail('', sender, bounce_text)
     smtp.quit()
 
+
 class FileBouncer(EmailExtractor):
-    def actOnMessage(self, message):
+    def act_on_message(self, message):
         bounce(message)
+
 
 from spamfilter.mixin import *
 
+
 class DbBouncer(ConfigMixin):
     def __init__(self, config):
-        self.readConfig(config)
-        self.session = createSession(self.getConfigItem('database', 'dburi'))
+        self.read_config(config)
+        self.session = create_session(self.get_config_item('database', 'dburi'))
 
-    def bounceFromId(self, spam_id):
+    def bounce_from_id(self, spam_id):
         from spamfilter.model.spam import Spam
 
         spam = self.session.query(Spam).get(spam_id)
