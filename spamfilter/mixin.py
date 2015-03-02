@@ -50,8 +50,6 @@ def create_session(dburi, serializable=True):
 
 def query_postfix_db(db, item):
     if item:
-        from subprocess import Popen, PIPE
-
         postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
         line = postmap.stdout.readline()
         postmap.wait()
