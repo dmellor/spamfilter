@@ -122,3 +122,7 @@ def is_dkim_verified(original_message):
         raise Exception('DKIM verification failed: return code %s' % ret_code)
 
     return result == 'pass'
+
+__all__ = ['ConfigMixin', 'create_session', 'get_dkim_domain',
+           'get_received_ips_and_helo', 'is_dkim_verified', 'query_postfix_db',
+           'Session']
