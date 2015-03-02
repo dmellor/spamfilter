@@ -99,26 +99,6 @@ class GreylistPolicy(Policy):
 
         self.manager.session.add(record)
 
-    def is_auto_whitelisted(self, mail_from, ip_address):
-        # If the sender has recently sent any spam, then they are not considered
-        # to be auto-whitelisted.
-        query = self.manager.session.query(ReceivedMail)
-        if query.filter_by(email=mail_from, is_spam=True).count() != 0:
-            return False
-
-        # If the auto-whitelist score is below the threshold, then the sender is
-        # assumed to be auto-whitelisted.
-        query = self.manager.session.query(AutoWhitelist)
-        classb = '.'.join(ip_address.split('.')[:2])
-        record = query.filter_by(email=mail_from, ip=classb).first()
-        if record:
-            threshold = int(self.manager.get_config_item(
-                'greylist', 'whitelist_threshold', 5))
-            if record.totscore / record.count < threshold:
-                return True
-
-        return False
-
     def is_whitelisted(self, mail_from):
         if not mail_from:
             return False
@@ -140,8 +120,4 @@ class GreylistPolicy(Policy):
 
     def is_accepted(self, mail_from, rcpt_to, ip_address):
         return (self.is_whitelisted(mail_from) or
-                (bool(self.manager.get_config_item('greylist',
-                                                   'use_autowhitelist',
-                                                   True)) and
-                 self.is_auto_whitelisted(mail_from, ip_address)) or
                 self.is_known_correspondent(mail_from, rcpt_to))
