@@ -82,7 +82,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             # bounce messages can often trigger SpamAssassin's rules.
             recipients = self.get_unique_recipients()
             if len(recipients) == 1:
-                if query_postfix_db(whitelist_db, recipients[0].lower()):
+                if query_postfix_db(whitelist_db, recipients[0]):
                     return True
 
         # The client is an external client - perform the spam and virus checks.
