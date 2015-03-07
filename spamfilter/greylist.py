@@ -1,7 +1,5 @@
 from spamfilter.model.greylist import create_greylist_class
-from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.sentmail import SentMail
-from spamfilter.model.receivedmail import ReceivedMail
 from spamfilter.policy import Policy, ACCEPTED
 from spamfilter.mixin import query_postfix_db
 
