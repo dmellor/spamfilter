@@ -17,6 +17,7 @@ spam_table = Table(
     Column('helo', String(1024), nullable=False),
     Column('contents', TEXT, nullable=False),
     Column('score', Float(precision='double'), nullable=False),
+    Column('honeypot', Boolean, server_default=text('false'), nullable=False),
     Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
 

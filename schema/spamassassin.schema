@@ -2,23 +2,21 @@
 -- PostgreSQL database dump
 --
 
+SET statement_timeout = 0;
 SET client_encoding = 'SQL_ASCII';
+SET standard_conforming_strings = off;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
+SET escape_string_warning = off;
 
 --
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
---
-
-COMMENT ON SCHEMA public IS 'Standard public schema';
-
-
---
--- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: -; Owner: 
+-- Name: plpgsql; Type: PROCEDURAL LANGUAGE; Schema: -; Owner: root
 --
 
 CREATE PROCEDURAL LANGUAGE plpgsql;
 
+
+ALTER PROCEDURAL LANGUAGE plpgsql OWNER TO root;
 
 SET search_path = public, pg_catalog;
 
@@ -26,19 +24,19 @@ SET search_path = public, pg_catalog;
 -- Name: convert_blacklist(); Type: FUNCTION; Schema: public; Owner: david
 --
 
-CREATE FUNCTION convert_blacklist() RETURNS "trigger"
-    AS '
+CREATE FUNCTION convert_blacklist() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 begin
-	if TG_OP = ''INSERT'' then
+	if TG_OP = 'INSERT' then
 		NEW.regexp = generateRegexp(NEW.mail_from);
-	elsif TG_OP = ''UPDATE'' and
+	elsif TG_OP = 'UPDATE' and
 		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
 		NEW.regexp = generateRegexp(NEW.mail_from);
 	end if;
 
 	return NEW;
-end;'
-    LANGUAGE plpgsql;
+end;$$;
 
 
 ALTER FUNCTION public.convert_blacklist() OWNER TO david;
@@ -47,19 +45,19 @@ ALTER FUNCTION public.convert_blacklist() OWNER TO david;
 -- Name: convert_original(); Type: FUNCTION; Schema: public; Owner: david
 --
 
-CREATE FUNCTION convert_original() RETURNS "trigger"
-    AS '
+CREATE FUNCTION convert_original() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 begin
-	if TG_OP = ''INSERT'' then
+	if TG_OP = 'INSERT' then
 		NEW.regexp = generateRegexp(NEW.original);
-	elsif TG_OP = ''UPDATE'' and
+	elsif TG_OP = 'UPDATE' and
 		(NEW.original != OLD.original or NEW.regexp != OLD.regexp) then
 		NEW.regexp = generateRegexp(NEW.original);
 	end if;
 
 	return NEW;
-end;'
-    LANGUAGE plpgsql;
+end;$$;
 
 
 ALTER FUNCTION public.convert_original() OWNER TO david;
@@ -68,19 +66,19 @@ ALTER FUNCTION public.convert_original() OWNER TO david;
 -- Name: convert_whitelist_from(); Type: FUNCTION; Schema: public; Owner: david
 --
 
-CREATE FUNCTION convert_whitelist_from() RETURNS "trigger"
-    AS '
+CREATE FUNCTION convert_whitelist_from() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 begin
-	if TG_OP = ''INSERT'' then
+	if TG_OP = 'INSERT' then
 		NEW.regexp = generateRegexp(NEW.mail_from);
-	elsif TG_OP = ''UPDATE'' and
+	elsif TG_OP = 'UPDATE' and
 		(NEW.mail_from != OLD.mail_from or NEW.regexp != OLD.regexp) then
 		NEW.regexp = generateRegexp(NEW.mail_from);
 	end if;
 
 	return NEW;
-end;'
-    LANGUAGE plpgsql;
+end;$$;
 
 
 ALTER FUNCTION public.convert_whitelist_from() OWNER TO david;
@@ -90,7 +88,8 @@ ALTER FUNCTION public.convert_whitelist_from() OWNER TO david;
 --
 
 CREATE FUNCTION extract_header(text, text) RETURNS text
-    AS 'DECLARE
+    LANGUAGE plpgsql IMMUTABLE STRICT
+    AS $_$DECLARE
 	header ALIAS FOR $1;
 	content ALIAS FOR $2;
 	startPos integer;
@@ -100,20 +99,20 @@ CREATE FUNCTION extract_header(text, text) RETURNS text
 	restText text DEFAULT NULL;
 	nextHeader text DEFAULT NULL;
 BEGIN
-	headerString := ''
-'' || lower(header) || '':'';	
+	headerString := '
+' || lower(header) || ':';	
 	startPos := strpos(lower(content), headerString);
 	IF startPos > 0 THEN
 		restText := substr(content, startPos + length(headerString));
-		endPos := strpos(restText, ''
-'');
+		endPos := strpos(restText, '
+');
 		headerText := substr(restText, 1, endPos - 1);
 		restText := substr(restText, endPos + 1);
 		LOOP
-			endPos := strpos(restText, ''
-'');
+			endPos := strpos(restText, '
+');
 			nextHeader := substr(restText, 1, endPos - 1);
-			IF length(nextHeader) = 0 OR substr(nextHeader, 1, 1) != '' '' OR
+			IF length(nextHeader) = 0 OR substr(nextHeader, 1, 1) != ' ' OR
 				length(trim(leading from nextHeader)) = 0 THEN
 				EXIT;
 			END IF;
@@ -126,8 +125,7 @@ BEGIN
 	headerText := trim(both from headerText);
 
 	RETURN headerText;
-END;'
-    LANGUAGE plpgsql IMMUTABLE STRICT;
+END;$_$;
 
 
 ALTER FUNCTION public.extract_header(text, text) OWNER TO david;
@@ -137,32 +135,32 @@ ALTER FUNCTION public.extract_header(text, text) OWNER TO david;
 --
 
 CREATE FUNCTION generateregexp(text) RETURNS text
-    AS E'
+    LANGUAGE plpgsql IMMUTABLE STRICT
+    AS $_$
 declare
 	orig alias for $1;
 	regexp text;
 	index integer;
 	c text;
 begin
-	regexp := ''^'';
+	regexp := '^';
 	for index in 1 .. length(orig) loop
 		c := substr(orig, index, 1);
-		if c = ''+'' then
-			regexp := regexp || ''\\\\+'';
-		elsif c = ''.'' then
-			regexp := regexp || ''\\\\.'';
-		elsif c = ''*'' then
-			regexp := regexp || ''.*'';
+		if c = '+' then
+			regexp := regexp || '\\+';
+		elsif c = '.' then
+			regexp := regexp || '\\.';
+		elsif c = '*' then
+			regexp := regexp || '.*';
 		else
 			regexp := regexp || c;
 		end if;
 	end loop;
 
-	regexp := regexp || ''$'';
+	regexp := regexp || '$';
 
 	return regexp;
-end;'
-    LANGUAGE plpgsql IMMUTABLE STRICT;
+end;$_$;
 
 
 ALTER FUNCTION public.generateregexp(text) OWNER TO david;
@@ -172,8 +170,8 @@ ALTER FUNCTION public.generateregexp(text) OWNER TO david;
 --
 
 CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler
-    AS '$libdir/plpgsql', 'plpgsql_call_handler'
-    LANGUAGE c;
+    LANGUAGE c
+    AS '$libdir/plpgsql', 'plpgsql_call_handler';
 
 
 ALTER FUNCTION public.plpgsql_call_handler() OWNER TO root;
@@ -183,24 +181,24 @@ ALTER FUNCTION public.plpgsql_call_handler() OWNER TO root;
 --
 
 CREATE FUNCTION spam_tests(id integer) RETURNS text
-    AS '
+    LANGUAGE plpgsql
+    AS $$
 declare
     test record;
     result text;
 begin
-    result := '''';
+    result := '';
     for test in select name from spam_tests where spam_id = id loop
-        result := result || '','' || test.name;
+        result := result || ',' || test.name;
     end loop;
 
-    if result != '''' then
+    if result != '' then
        result := substring(result from 2);
     end if;
 
     return result;
 end;
-'
-    LANGUAGE plpgsql;
+$$;
 
 
 ALTER FUNCTION public.spam_tests(id integer) OWNER TO david;
@@ -209,14 +207,14 @@ ALTER FUNCTION public.spam_tests(id integer) OWNER TO david;
 -- Name: stamp(); Type: FUNCTION; Schema: public; Owner: david
 --
 
-CREATE FUNCTION stamp() RETURNS "trigger"
-    AS '
+CREATE FUNCTION stamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
 BEGIN
-	NEW.modified := ''now'';
+	NEW.modified := 'now';
 	RETURN NEW;
 END;
-'
-    LANGUAGE plpgsql;
+$$;
 
 
 ALTER FUNCTION public.stamp() OWNER TO david;
@@ -226,6 +224,7 @@ ALTER FUNCTION public.stamp() OWNER TO david;
 --
 
 CREATE SEQUENCE auto_whitelist_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -262,7 +261,7 @@ ALTER TABLE public.auto_whitelist OWNER TO david;
 --
 
 CREATE TABLE domain_names (
-    "domain" character varying(255) NOT NULL,
+    domain character varying(255) NOT NULL,
     display character varying(255) NOT NULL
 );
 
@@ -274,6 +273,7 @@ ALTER TABLE public.domain_names OWNER TO david;
 --
 
 CREATE SEQUENCE greylist_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -320,6 +320,7 @@ ALTER TABLE public.quarantine_recipients OWNER TO david;
 --
 
 CREATE SEQUENCE quarantine_recipients_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -333,7 +334,7 @@ ALTER TABLE public.quarantine_recipients_id_seq OWNER TO david;
 --
 
 CREATE TABLE received_mail (
-    id serial NOT NULL,
+    id integer NOT NULL,
     email character varying(1024) NOT NULL,
     ip_address character varying(15) NOT NULL,
     is_spam boolean NOT NULL,
@@ -348,6 +349,7 @@ ALTER TABLE public.received_mail OWNER TO david;
 --
 
 CREATE SEQUENCE received_mail_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -357,11 +359,18 @@ CREATE SEQUENCE received_mail_id_seq
 ALTER TABLE public.received_mail_id_seq OWNER TO david;
 
 --
+-- Name: received_mail_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: david
+--
+
+ALTER SEQUENCE received_mail_id_seq OWNED BY received_mail.id;
+
+
+--
 -- Name: sent_mail; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
 CREATE TABLE sent_mail (
-    id serial NOT NULL,
+    id integer NOT NULL,
     sender character varying(255) NOT NULL,
     recipient character varying(255) NOT NULL,
     messages integer NOT NULL,
@@ -373,10 +382,32 @@ CREATE TABLE sent_mail (
 ALTER TABLE public.sent_mail OWNER TO david;
 
 --
+-- Name: sent_mail_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE sent_mail_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.sent_mail_id_seq OWNER TO david;
+
+--
+-- Name: sent_mail_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: david
+--
+
+ALTER SEQUENCE sent_mail_id_seq OWNED BY sent_mail.id;
+
+
+--
 -- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
 CREATE SEQUENCE spam_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -393,9 +424,10 @@ CREATE TABLE spam (
     id integer DEFAULT nextval('spam_id_seq'::regclass) NOT NULL,
     bounce character varying(1024),
     ip_address character varying(15) NOT NULL,
-    helo character varying(1024) NOT NULL,
-    contents text NOT NULL,
-    score double precision NOT NULL,
+    helo character varying(1024),
+    contents text,
+    score double precision,
+    honeypot boolean DEFAULT false NOT NULL,
     created timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -421,6 +453,7 @@ ALTER TABLE public.spam_recipients OWNER TO david;
 --
 
 CREATE SEQUENCE spam_recipients_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -434,6 +467,7 @@ ALTER TABLE public.spam_recipients_id_seq OWNER TO david;
 --
 
 CREATE SEQUENCE spam_tests_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -476,6 +510,7 @@ ALTER TABLE public.virus_recipients OWNER TO david;
 --
 
 CREATE SEQUENCE virus_recipients_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -489,6 +524,7 @@ ALTER TABLE public.virus_recipients_id_seq OWNER TO david;
 --
 
 CREATE SEQUENCE viruses_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -519,6 +555,7 @@ ALTER TABLE public.viruses OWNER TO david;
 --
 
 CREATE SEQUENCE whitelist_from_id_seq
+    START WITH 1
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -526,6 +563,20 @@ CREATE SEQUENCE whitelist_from_id_seq
 
 
 ALTER TABLE public.whitelist_from_id_seq OWNER TO david;
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY received_mail ALTER COLUMN id SET DEFAULT nextval('received_mail_id_seq'::regclass);
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY sent_mail ALTER COLUMN id SET DEFAULT nextval('sent_mail_id_seq'::regclass);
+
 
 --
 -- Name: auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
@@ -540,7 +591,7 @@ ALTER TABLE ONLY auto_whitelist
 --
 
 ALTER TABLE ONLY domain_names
-    ADD CONSTRAINT domain_names_domain_key UNIQUE ("domain");
+    ADD CONSTRAINT domain_names_domain_key UNIQUE (domain);
 
 
 --
@@ -763,10 +814,10 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- Name: auto_whitelist_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE auto_whitelist_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE auto_whitelist_id_seq FROM david;
-GRANT ALL ON TABLE auto_whitelist_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE auto_whitelist_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE auto_whitelist_id_seq FROM david;
+GRANT ALL ON SEQUENCE auto_whitelist_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE auto_whitelist_id_seq TO qmail;
 
 
 --
@@ -776,7 +827,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist_id_seq TO qmail;
 REVOKE ALL ON TABLE auto_whitelist FROM PUBLIC;
 REVOKE ALL ON TABLE auto_whitelist FROM david;
 GRANT ALL ON TABLE auto_whitelist TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE auto_whitelist TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auto_whitelist TO qmail;
 
 
 --
@@ -793,10 +844,10 @@ GRANT SELECT ON TABLE domain_names TO qmail;
 -- Name: greylist_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE greylist_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE greylist_id_seq FROM david;
-GRANT ALL ON TABLE greylist_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE greylist_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE greylist_id_seq FROM david;
+GRANT ALL ON SEQUENCE greylist_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE greylist_id_seq TO qmail;
 
 
 --
@@ -806,7 +857,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist_id_seq TO qmail;
 REVOKE ALL ON TABLE greylist FROM PUBLIC;
 REVOKE ALL ON TABLE greylist FROM david;
 GRANT ALL ON TABLE greylist TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE greylist TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE greylist TO qmail;
 
 
 --
@@ -826,17 +877,17 @@ GRANT SELECT ON TABLE quarantine_recipients TO qmail;
 REVOKE ALL ON TABLE received_mail FROM PUBLIC;
 REVOKE ALL ON TABLE received_mail FROM david;
 GRANT ALL ON TABLE received_mail TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE received_mail TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE received_mail TO qmail;
 
 
 --
 -- Name: received_mail_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE received_mail_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE received_mail_id_seq FROM david;
-GRANT ALL ON TABLE received_mail_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE received_mail_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE received_mail_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE received_mail_id_seq FROM david;
+GRANT ALL ON SEQUENCE received_mail_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE received_mail_id_seq TO qmail;
 
 
 --
@@ -846,27 +897,27 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE received_mail_id_seq TO qmail;
 REVOKE ALL ON TABLE sent_mail FROM PUBLIC;
 REVOKE ALL ON TABLE sent_mail FROM david;
 GRANT ALL ON TABLE sent_mail TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE sent_mail TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sent_mail TO qmail;
 
 
 --
 -- Name: sent_mail_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE sent_mail_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE sent_mail_id_seq FROM david;
-GRANT ALL ON TABLE sent_mail_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE sent_mail_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE sent_mail_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE sent_mail_id_seq FROM david;
+GRANT ALL ON SEQUENCE sent_mail_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE sent_mail_id_seq TO qmail;
 
 
 --
 -- Name: spam_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE spam_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE spam_id_seq FROM david;
-GRANT ALL ON TABLE spam_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE spam_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE spam_id_seq FROM david;
+GRANT ALL ON SEQUENCE spam_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE spam_id_seq TO qmail;
 
 
 --
@@ -876,7 +927,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_id_seq TO qmail;
 REVOKE ALL ON TABLE spam FROM PUBLIC;
 REVOKE ALL ON TABLE spam FROM david;
 GRANT ALL ON TABLE spam TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE spam TO qmail;
 
 
 --
@@ -886,27 +937,27 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam TO qmail;
 REVOKE ALL ON TABLE spam_recipients FROM PUBLIC;
 REVOKE ALL ON TABLE spam_recipients FROM david;
 GRANT ALL ON TABLE spam_recipients TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE spam_recipients TO qmail;
 
 
 --
 -- Name: spam_recipients_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE spam_recipients_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE spam_recipients_id_seq FROM david;
-GRANT ALL ON TABLE spam_recipients_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_recipients_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE spam_recipients_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE spam_recipients_id_seq FROM david;
+GRANT ALL ON SEQUENCE spam_recipients_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE spam_recipients_id_seq TO qmail;
 
 
 --
 -- Name: spam_tests_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE spam_tests_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE spam_tests_id_seq FROM david;
-GRANT ALL ON TABLE spam_tests_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE spam_tests_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE spam_tests_id_seq FROM david;
+GRANT ALL ON SEQUENCE spam_tests_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE spam_tests_id_seq TO qmail;
 
 
 --
@@ -916,7 +967,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests_id_seq TO qmail;
 REVOKE ALL ON TABLE spam_tests FROM PUBLIC;
 REVOKE ALL ON TABLE spam_tests FROM david;
 GRANT ALL ON TABLE spam_tests TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE spam_tests TO qmail;
 
 
 --
@@ -926,27 +977,27 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE spam_tests TO qmail;
 REVOKE ALL ON TABLE virus_recipients FROM PUBLIC;
 REVOKE ALL ON TABLE virus_recipients FROM david;
 GRANT ALL ON TABLE virus_recipients TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE virus_recipients TO qmail;
 
 
 --
 -- Name: virus_recipients_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE virus_recipients_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE virus_recipients_id_seq FROM david;
-GRANT ALL ON TABLE virus_recipients_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE virus_recipients_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE virus_recipients_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE virus_recipients_id_seq FROM david;
+GRANT ALL ON SEQUENCE virus_recipients_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE virus_recipients_id_seq TO qmail;
 
 
 --
 -- Name: viruses_id_seq; Type: ACL; Schema: public; Owner: david
 --
 
-REVOKE ALL ON TABLE viruses_id_seq FROM PUBLIC;
-REVOKE ALL ON TABLE viruses_id_seq FROM david;
-GRANT ALL ON TABLE viruses_id_seq TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses_id_seq TO qmail;
+REVOKE ALL ON SEQUENCE viruses_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE viruses_id_seq FROM david;
+GRANT ALL ON SEQUENCE viruses_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE viruses_id_seq TO qmail;
 
 
 --
@@ -956,7 +1007,7 @@ GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses_id_seq TO qmail;
 REVOKE ALL ON TABLE viruses FROM PUBLIC;
 REVOKE ALL ON TABLE viruses FROM david;
 GRANT ALL ON TABLE viruses TO david;
-GRANT INSERT,SELECT,UPDATE,DELETE ON TABLE viruses TO qmail;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE viruses TO qmail;
 
 
 --
