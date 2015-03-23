@@ -16,7 +16,9 @@ from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.receivedmail import ReceivedMail
 
 SPAM = '250 Message was identified as spam and has been quarantined'
+HONEYPOT = '250 Message was sent to a honeypot address'
 VIRUS = '250 Message contains a virus and has been quarantined'
+UNKNOWN = '550 Unknown user'
 
 Greylist = None
 
@@ -56,6 +58,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             self.disabled_tests.append(DisabledCharsetTests(value))
 
     def check_message(self, message):
+        # First check if any of the recipients are honeypot addresses. If they
+        # are then no spam checks will be performed.
+        self.check_honeypot()
+
         # If the sender is whitelisted then we do not want to perform any
         # checks. This is to prevent quarantining mail that SpamAssassin
         # consistently and incorrectly flags as spam.
@@ -65,16 +71,16 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 # First check the full address.
                 mail_from = self.bounce.lower()
                 if query_postfix_db(whitelist_db, mail_from):
-                    return True
+                    return self.determine_whitelist_status()
 
                 # Check the domain.
                 domain = mail_from.index('@') + 1
                 if query_postfix_db(whitelist_db, mail_from[domain:]):
-                    return True
+                    return self.determine_whitelist_status()
 
             # Check if the HELO string is whitelisted.
             if query_postfix_db(whitelist_db, self.remote_host):
-                return True
+                return self.determine_whitelist_status()
 
             # If there is only a single recipient, then check if the recipient
             # is whitelisted. This is mainly to prevent bounce messages to a
@@ -83,7 +89,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             recipients = self.get_unique_recipients()
             if len(recipients) == 1:
                 if query_postfix_db(whitelist_db, recipients[0]):
-                    return True
+                    return self.determine_whitelist_status()
 
         # The client is an external client - perform the spam and virus checks.
         message = ''.join(message)
@@ -109,6 +115,15 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         return ok
 
+    # If the message is from a whitelisted address and is addressed only to
+    # honeypot recipients, then let the sender know by bouncing the message.
+    def determine_whitelist_status(self):
+        if self.is_to_honeypot and not self.non_honeypot_recipients:
+            self.error_response = UNKNOWN
+            return False
+        else:
+            return True
+
     def perform_checks(self, message):
         # If the message if being sent from this host, then do not perform any
         # checks.
@@ -117,7 +132,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         # If the message is above a certain size, then automatically accept it.
         max_len = int(self.get_config_item('spamfilter', 'max_message_length'))
-        if len(message) > max_len:
+        if len(message) > max_len and not self.is_to_honeypot:
             return True
 
         ok = self.check_spam(message) and self.check_virus(message)
@@ -190,13 +205,14 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                     if record:
                         record.totscore -= adjusted_score
 
-        ok = score < required
+        ok = score < required and not self.is_to_honeypot
         if not ok:
             # The message is spam. In case of false positives, the message is
             # quarantined.
             spam = Spam(bounce=self.bounce, ip_address=self.remote_addr,
                         helo=self.remote_host, contents=message, score=score,
-                        tests=determine_spam_tests(tests))
+                        tests=determine_spam_tests(tests),
+                        honeypot=self.is_to_honeypot)
             recipients = self.get_unique_recipients()
             spam.recipients = [SpamRecipient(recipient=x) for x in recipients]
             self.session.add(spam)
@@ -210,7 +226,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             self.fix_awl(msg_obj, dkim_domain, score)
 
             # Set the error response to be written to the mail log.
-            self.error_response = SPAM
+            self.error_response = HONEYPOT if self.is_to_honeypot else SPAM
 
         return ok
 
@@ -238,7 +254,12 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
     def get_unique_recipients(self):
         recips = {}
-        for recip in self.rcpt_to:
+        if self.is_to_honeypot:
+            originals = self.non_honeypot_recipients
+        else:
+            originals = self.rcpt_to
+
+        for recip in originals:
             recips[recip] = 1
 
         return recips.keys()
@@ -338,6 +359,18 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                         tests[-1] = (test_score, test, description)
 
         return score, required, tests
+
+    def check_honeypot(self):
+        self.is_to_honeypot = False
+        self.non_honeypot_recipients = []
+        honeypot_db = self.get_config_item('spamfilter', 'honeypot_access_db',
+                                           None)
+        if honeypot_db:
+            for recipient in self.rcpt_to:
+                if query_postfix_db(honeypot_db, recipient):
+                    self.is_to_honeypot = True
+                else:
+                    self.non_honeypot_recipients.append(recipient)
 
 
 def check_clamav(message, host, port, timeout):
