@@ -1,0 +1,17 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+if [ -z "$1" ]; then
+    config=config.ini
+else
+    config="$1"
+fi
+
+. bin/activate
+python -c '
+import sys
+sys.argv[0] = "honeypot"
+from spamfilter.honeypot import HoneyPot
+HoneyPot(config=sys.argv[1]).run()' "$config"
