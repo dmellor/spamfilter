@@ -14,5 +14,5 @@ exec python -c '
 import sys
 sys.argv[0] = "spamcheck"
 from spamfilter.spamcheck import SpamCheck
-SpamCheck(config=sys.argv[1]).processMessage()
+SpamCheck(config=sys.argv[1]).process_message()
 sys.exit(0)' "$config"
