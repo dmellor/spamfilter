@@ -15,5 +15,5 @@ exec python -c '
 import sys
 sys.argv[0] = "consume"
 from spamfilter.consume import SpamConsumer
-SpamConsumer(config=sys.argv[1]).reportSpam(sys.argv[2])
+SpamConsumer(config=sys.argv[1]).report_spam(sys.argv[2])
 sys.exit(0)' "$config" "$1"
