@@ -66,7 +66,7 @@ class HoneyPot(ConfigMixin):
                     ip_address = match.group(2)
                     match = RECIPIENT.search(line)
                     if match:
-                        recipient = match.group(1)
+                        recipient = match.group(1).lower()
                     else:
                         logging.error('Could not determine recipient')
                         continue
