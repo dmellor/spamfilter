@@ -7,10 +7,13 @@ import traceback
 
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam
+from spamfilter.model.greylist import create_greylist_class
 
 UNKNOWN = re.compile(r'RCPT from ([^\[]+)\[([^\]]+)')
 RECIPIENT = re.compile(r'to=<([^>]+)')
 SENDER = re.compile(r'from=<([^>]+)')
+
+Greylist = None
 
 
 def become_daemon():
@@ -37,7 +40,10 @@ class HoneyPot(ConfigMixin):
     """
 
     def __init__(self, config):
+        global Greylist
         self.read_config(config)
+        Greylist = create_greylist_class(
+            self.get_config_item('greylist', 'interval', 30))
 
     def run(self):
         become_daemon()
@@ -84,6 +90,15 @@ class HoneyPot(ConfigMixin):
         spam = Spam(bounce=sender, ip_address=ip_address, helo=helo,
                     honeypot=True)
         self.session.add(spam)
+
+        # Remove the greylist entries for the class C network to ensure that
+        # greylist timeouts have to be restarted once a honeypot address has
+        # been identified.
+        classc = '.'.join(ip_address.split('.')[:3])
+        query = self.session.query(Greylist).filter_by(ip_address=classc)
+        for entry in query.all():
+            self.session.delete(entry)
+
         self.session.commit()
 
         db = open(self.get_config_item('honeypot', 'honeypot_db'), 'a')

@@ -138,17 +138,20 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         ok = self.check_spam(message) and self.check_virus(message)
 
         # If the message is spam or contains a virus then we ensure that its
-        # corresponding greylist entry, if any, is removed.
+        # corresponding greylist entry is removed. We used to only remove the
+        # greylist entries corresponding to the recipients of the message, but
+        # for cases where a spam network is using several servers on the same
+        # class C network this would not prevent a message from being accepted
+        # by the greylist mechanism once a message to another recipient has
+        # been recognised as spam from another server on the same network. The
+        # new policy is to remove all of the greylist records for the class C
+        # network once a message has been identified as spam or a virus.
         if not ok:
             ip_address = '.'.join(self.remote_addr.split('.')[:3])
-            query = self.session.query(Greylist)
-            mail_from = self.bounce.lower() if self.bounce else None
-            query = query.filter_by(mail_from=mail_from, ip_address=ip_address)
-            recipients = self.get_unique_recipients()
-            for recipient in recipients:
-                entry = query.filter_by(rcpt_to=recipient).first()
-                if entry:
-                    self.session.delete(entry)
+            query = self.session.query(Greylist).filter_by(
+                ip_address=ip_address)
+            for entry in query.all():
+                self.session.delete(entry)
 
         return ok
 
