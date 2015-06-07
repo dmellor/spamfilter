@@ -9,10 +9,14 @@ else
     config="$1"
 fi
 
+ARGS='config=sys.argv[1]'
+[ -f .policyrc ] && . ./policyrc
+[ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
+
 . bin/activate
-exec python -c '
+exec python -c "
 import sys
-sys.argv[0] = "policy"
+sys.argv[0] = 'policy'
 from spamfilter.policy import PolicyManager
-PolicyManager(config=sys.argv[1]).process()
-sys.exit(0)' "$config"
+PolicyManager($ARGS).process()
+sys.exit(0)" "$config"

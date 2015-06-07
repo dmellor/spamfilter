@@ -9,10 +9,14 @@ else
     config="$1"
 fi
 
+ARGS='config=sys.argv[1]'
+[ -f spamcheckrc ] && . ./spamcheckrc
+[ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
+
 . bin/activate
-exec python -c '
+exec python -c "
 import sys
-sys.argv[0] = "spamcheck"
+sys.argv[0] = 'spamcheck'
 from spamfilter.spamcheck import SpamCheck
-SpamCheck(config=sys.argv[1]).process_message()
-sys.exit(0)' "$config"
+SpamCheck($ARGS).process_message()
+sys.exit(0)" "$config"

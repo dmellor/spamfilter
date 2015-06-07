@@ -10,10 +10,14 @@ else
     shift
 fi
 
+ARGS='config=sys.argv[1]'
+[ -f .report_spamrc ] && . ./report_spamrc
+[ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
+
 . bin/activate
-exec python -c '
+exec python -c "
 import sys
-sys.argv[0] = "consume"
+sys.argv[0] = 'consume'
 from spamfilter.consume import SpamConsumer
-SpamConsumer(config=sys.argv[1]).report_spam(sys.argv[2])
-sys.exit(0)' "$config" "$1"
+SpamConsumer($ARGS).report_spam(sys.argv[2])
+sys.exit(0)" "$config" "$1"

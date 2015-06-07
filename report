@@ -9,10 +9,14 @@ else
     config="$1"
 fi
 
+ARGS='config=sys.argv[1]'
+[ -f .reportrc ] && . ./reportrc
+[ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
+
 . bin/activate
-exec python -c '
+exec python -c "
 import sys
-sys.argv[0] = "report"
+sys.argv[0] = 'report'
 from spamfilter.report import ReportGenerator
-ReportGenerator(config=sys.argv[1]).report()
-sys.exit(0)' "$config"
+ReportGenerator($ARGS).report()
+sys.exit(0)" "$config"

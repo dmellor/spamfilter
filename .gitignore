@@ -1,3 +1,9 @@
 *.pyc
 *.ini
 schema/spamassassin-*.gz
+/consumerc
+/honeypotrc
+/policyrc
+/reportrc
+/report_spamrc
+/spamcheckrc

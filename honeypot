@@ -9,9 +9,13 @@ else
     config="$1"
 fi
 
+ARGS='config=sys.argv[1]'
+[ -f .honeypotrc ] && . ./honeypotrc
+[ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
+
 . bin/activate
-python -c '
+python -c "
 import sys
-sys.argv[0] = "honeypot"
+sys.argv[0] = 'honeypot'
 from spamfilter.honeypot import HoneyPot
-HoneyPot(config=sys.argv[1]).run()' "$config"
+HoneyPot($ARGS).run()" "$config"
