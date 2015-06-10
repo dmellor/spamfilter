@@ -407,19 +407,21 @@ def check_clamav(message, host, port, timeout):
 
 
 def determine_spam_tests(tests):
-    scores, names, descriptions = zip(*tests)
     spam_tests = []
-    for i in range(len(names)):
-        # Some of the more esoteric SpamAssassin tests do not have a
-        # description, in which case spamc will report the description as being
-        # equal to the test name. For such tests we create a SpamTest object
-        # with the description set to null.
-        if names[i] != descriptions[i]:
-            spam_tests.append(
-                SpamTest(name=names[i], description=descriptions[i],
-                         score=float(scores[i])))
-        else:
-            spam_tests.append(SpamTest(name=names[i], score=float(scores[i])))
+    if tests:
+        scores, names, descriptions = zip(*tests)
+        for i in range(len(names)):
+            # Some of the more esoteric SpamAssassin tests do not have a
+            # description, in which case spamc will report the description as
+            # being equal to the test name. For such tests we create a SpamTest
+            # object with the description set to null.
+            if names[i] != descriptions[i]:
+                spam_tests.append(
+                    SpamTest(name=names[i], description=descriptions[i],
+                             score=float(scores[i])))
+            else:
+                spam_tests.append(
+                    SpamTest(name=names[i], score=float(scores[i])))
 
     return spam_tests
 
