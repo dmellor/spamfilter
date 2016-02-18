@@ -110,7 +110,8 @@ class ReportGenerator(ConfigMixin):
 def create_message_summaries(messages, recipient):
     # Order the messages by date, and then create a summary of each message.
     messages.sort(key=lambda msg: msg.created)
-    return [MessageSummary(bounce=x.bounce, subject=translate(x.subject),
+    return [MessageSummary(bounce=translate(x.bounce),
+                           subject=translate(x.subject),
                            date=x.created.replace(microsecond=0),
                            delivery_id=create_delivery_id(x, recipient))
             for x in messages]
