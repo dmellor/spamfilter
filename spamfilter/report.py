@@ -8,6 +8,7 @@ from mx.DateTime.ARPA import str as rfc822str
 from sqlalchemy import select, text
 import codecs
 from email.header import decode_header
+import traceback
 
 from spamfilter.mixin import ConfigMixin, create_session
 from spamfilter.model.spam import SpamRecipient, spam_recipients_table
@@ -63,8 +64,8 @@ class ReportGenerator(ConfigMixin):
                     self.session.rollback()
                     attempt += 1
                     if attempt == 2:
-                        print "Unable to send report to %s: %s" % \
-                              (recipient, exc)
+                        print "Unable to send report to %s: %s\n%s" % \
+                              (recipient, exc, traceback.format_exc())
                     time.sleep(5)
 
     def send_quarantine_report(self, recipient, host):
