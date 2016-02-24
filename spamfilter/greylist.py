@@ -71,7 +71,7 @@ class GreylistPolicy(Policy):
         # before.
         classc = '.'.join(ip_address.split('.')[:3])
         query = self.manager.session.query(self.greylist_class)
-        query = query.filter_by(ip_address=classc, mail_from=mail_from,
+        query = query.filter_by(classc=classc, mail_from=mail_from,
                                 rcpt_to=rcpt_to)
         return query.first()
 
@@ -87,7 +87,7 @@ class GreylistPolicy(Policy):
     def create_greylist_record(self, rcpt_to, mail_from, ip_address, instance,
                                status):
         classc = '.'.join(ip_address.split('.')[:3])
-        record = self.greylist_class(ip_address=classc, rcpt_to=rcpt_to,
+        record = self.greylist_class(classc=classc, rcpt_to=rcpt_to,
                                      mail_from=mail_from,
                                      last_instance=instance)
         if status == ACCEPTED:

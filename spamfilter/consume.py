@@ -44,7 +44,7 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
         recipient = message.get_all('X-Original-To')[0]
         classc = '.'.join(ips[0].split('.')[:3])
         query = query.filter_by(rcpt_to=recipient, mail_from=mail_from,
-                                ip_address=classc)
+                                classc=classc)
         greylist = query.first()
         if greylist:
             self.session.delete(greylist)

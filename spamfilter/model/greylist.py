@@ -7,7 +7,7 @@ from spamfilter.model import meta
 greylist_table = Table(
     'greylist', meta,
     Column('id', Integer, Sequence('greylist_id_seq'), primary_key=True),
-    Column('ip_address', String(11), nullable=False),
+    Column('classc', String(11), nullable=False),
     Column('mail_from', String(1024), nullable=True),
     Column('rcpt_to', String(1024), nullable=False),
     Column('last_instance', String(255), nullable=True),
@@ -15,8 +15,7 @@ greylist_table = Table(
     Column('unsuccessful', Integer, server_default='0', nullable=False),
     Column('created', TIMESTAMP, server_default=text('now()')),
     Column('modified', TIMESTAMP),
-    UniqueConstraint('ip_address', 'mail_from', 'rcpt_to',
-                     name='greylist_tuple'))
+    UniqueConstraint('classc', 'mail_from', 'rcpt_to', name='greylist_tuple'))
 
 
 def create_greylist_class(interval=None):

@@ -95,7 +95,7 @@ class HoneyPot(ConfigMixin):
         # greylist timeouts have to be restarted once a honeypot address has
         # been identified.
         classc = '.'.join(ip_address.split('.')[:3])
-        query = self.session.query(Greylist).filter_by(ip_address=classc)
+        query = self.session.query(Greylist).filter_by(classc=classc)
         for entry in query.all():
             self.session.delete(entry)
 

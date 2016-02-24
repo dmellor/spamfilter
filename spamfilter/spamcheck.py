@@ -147,9 +147,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # new policy is to remove all of the greylist records for the class C
         # network once a message has been identified as spam or a virus.
         if not ok:
-            ip_address = '.'.join(self.remote_addr.split('.')[:3])
-            query = self.session.query(Greylist).filter_by(
-                ip_address=ip_address)
+            classc = '.'.join(self.remote_addr.split('.')[:3])
+            query = self.session.query(Greylist).filter_by(classc=classc)
             for entry in query.all():
                 self.session.delete(entry)
 

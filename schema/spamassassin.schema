@@ -288,7 +288,7 @@ ALTER TABLE public.greylist_id_seq OWNER TO david;
 
 CREATE TABLE greylist (
     id integer DEFAULT nextval('greylist_id_seq'::regclass) NOT NULL,
-    ip_address character varying(11) NOT NULL,
+    classc character varying(11) NOT NULL,
     mail_from character varying(1024),
     rcpt_to character varying(1024) NOT NULL,
     last_instance character varying(255),
@@ -674,10 +674,10 @@ CREATE UNIQUE INDEX auto_whitelist_address_index ON auto_whitelist USING btree (
 
 
 --
--- Name: greylist_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+-- Name: greylist_classc; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-CREATE INDEX greylist_ip_address ON greylist USING btree (ip_address);
+CREATE INDEX greylist_classc ON greylist USING btree (classc);
 
 
 --
@@ -691,7 +691,7 @@ CREATE INDEX greylist_mail_from ON greylist USING btree (mail_from);
 -- Name: greylist_tuple; Type: INDEX; Schema: public; Owner: david; Tablespace: 
 --
 
-CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (ip_address, mail_from, rcpt_to);
+CREATE UNIQUE INDEX greylist_tuple ON greylist USING btree (classc, mail_from, rcpt_to);
 
 
 --
