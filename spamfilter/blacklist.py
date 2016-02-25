@@ -2,7 +2,8 @@ from spamfilter.policy import ACCEPTED
 from spamfilter.greylist import GreylistPolicy
 from spamfilter.model.spam import Spam, spam_table
 from spamfilter.model.greylist import create_greylist_class
-from sqlalchemy.sql import select, func
+from spamfilter.model.smtpdconnection import SmtpdConnection
+from sqlalchemy.sql import select, func, text
 
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
 HARD_REJECTED = 'reject Spam has recently been received from %s'
@@ -10,6 +11,8 @@ SOFT_CLASSC_REJECTED = \
     'defer_if_permit Spam has recently been received from the %s network'
 HARD_CLASSC_REJECTED = \
     'reject Spam has recently been received from the %s network'
+SUSPICIOUS_REJECTED = \
+    'defer_if_permit Suspicious connection attempts from the %s network'
 
 OK = 0
 SOFT = 1
@@ -27,6 +30,12 @@ class BlacklistPolicy(GreylistPolicy):
             'blacklist', 'soft_classc_threshold', 2))
         self.hard_classc_threshold = int(manager.get_config_item(
             'blacklist', 'hard_classc_threshold', 5))
+        self.smtpd_connection_interval = int(manager.get_config_item(
+            'smtpd_connection', 'interval', 60))
+        self.suspicious_classc_threshold = int(manager.get_config_item(
+            'smtpd_connection', 'suspicious_classc_threshhold', 10))
+        self.suspicious_sibling_address_threshold = int(manager.get_config_item(
+            'smtpd_connection', 'suspicious_sibling_address_threshold', 2))
 
     # noinspection PyAttributeOutsideInit
     def load_greylist_class(self):
@@ -77,8 +86,24 @@ class BlacklistPolicy(GreylistPolicy):
 
         if level != OK:
             return self.greylist(rcpt_to, mail_from, ip_address, status)
-        else:
-            return ACCEPTED
+
+        # Third test - check for suspicious activity from class C networks.
+        classc = '.'.join(ip_address.split('.')[:3])
+        interval = "now() - created <= interval '%s minutes'" % \
+                   self.smtpd_connection_interval
+        query = self.manager.session.query(SmtpdConnection).filter(
+            SmtpdConnection.classc == classc).filter(text(interval))
+        num_classc = query.count()
+        if num_classc >= self.suspicious_classc_threshold:
+            num_siblings = self.manager.session.query(
+                func.count(SmtpdConnection.ip_address.distinct())).filter(
+                SmtpdConnection.classc == classc).filter(
+                SmtpdConnection.ip_address != ip_address).filter(
+                text(interval)).one()[0]
+            if num_siblings >= self.suspicious_sibling_address_threshold:
+                return SUSPICIOUS_REJECTED % get_network_block(ip_address)
+
+        return ACCEPTED
 
     def get_blacklist_thresholds(self):
         query = self.manager.session.query(Spam)

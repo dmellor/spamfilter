@@ -8,10 +8,12 @@ import traceback
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam
 from spamfilter.model.greylist import create_greylist_class
+from spamfilter.model.smtpdconnection import SmtpdConnection
 
 UNKNOWN = re.compile(r'RCPT from ([^\[]+)\[([^\]]+)')
 RECIPIENT = re.compile(r'to=<([^>]+)')
 SENDER = re.compile(r'from=<([^>]+)')
+CONNECT = re.compile(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]$')
 
 Greylist = None
 
@@ -84,9 +86,13 @@ class HoneyPot(ConfigMixin):
                         logging.error('Could not determine sender')
                         continue
 
-                    self.process(helo, ip_address, recipient, sender)
+                    self.process_honeypot(helo, ip_address, recipient, sender)
+            elif 'postfix/smtpd' in line and 'connect from' in line:
+                match = CONNECT.search(line)
+                if match:
+                    self.process_connect(match.group(1))
 
-    def process(self, helo, ip_address, recipient, sender):
+    def process_honeypot(self, helo, ip_address, recipient, sender):
         spam = Spam(bounce=sender, ip_address=ip_address, helo=helo,
                     honeypot=True)
         self.session.add(spam)
@@ -114,3 +120,11 @@ class HoneyPot(ConfigMixin):
         status = command.wait()
         if status:
             logging.error('Error code %s from make command' % status)
+
+    def process_connect(self, ip_address):
+        if ip_address != '127.0.0.1':
+            classc = '.'.join(ip_address.split('.')[:3])
+            smtpd_connection = SmtpdConnection(ip_address=ip_address,
+                                               classc=classc)
+            self.session.add(smtpd_connection)
+            self.session.commit()

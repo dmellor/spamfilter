@@ -403,6 +403,41 @@ ALTER SEQUENCE sent_mail_id_seq OWNED BY sent_mail.id;
 
 
 --
+-- Name: smtpd_connections; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE smtpd_connections (
+    id integer NOT NULL,
+    ip_address character varying(15) NOT NULL,
+    classc character varying(11) NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.smtpd_connections OWNER TO david;
+
+--
+-- Name: smtpd_connections_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE smtpd_connections_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.smtpd_connections_id_seq OWNER TO david;
+
+--
+-- Name: smtpd_connections_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: david
+--
+
+ALTER SEQUENCE smtpd_connections_id_seq OWNED BY smtpd_connections.id;
+
+
+--
 -- Name: spam_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -579,6 +614,13 @@ ALTER TABLE ONLY sent_mail ALTER COLUMN id SET DEFAULT nextval('sent_mail_id_seq
 
 
 --
+-- Name: id; Type: DEFAULT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY smtpd_connections ALTER COLUMN id SET DEFAULT nextval('smtpd_connections_id_seq'::regclass);
+
+
+--
 -- Name: auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -624,6 +666,14 @@ ALTER TABLE ONLY quarantine_recipients
 
 ALTER TABLE ONLY sent_mail
     ADD CONSTRAINT sent_mail_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: smtpd_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY smtpd_connections
+    ADD CONSTRAINT smtpd_connections_pkey PRIMARY KEY (id);
 
 
 --
@@ -706,6 +756,13 @@ CREATE INDEX received_mail_email_is_spam ON received_mail USING btree (email, is
 --
 
 CREATE UNIQUE INDEX sent_mail_index ON sent_mail USING btree (sender, recipient);
+
+
+--
+-- Name: smtpd_connections_classc_ip_address; Type: INDEX; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE INDEX smtpd_connections_classc_ip_address ON smtpd_connections USING btree (classc, ip_address);
 
 
 --
@@ -908,6 +965,26 @@ REVOKE ALL ON SEQUENCE sent_mail_id_seq FROM PUBLIC;
 REVOKE ALL ON SEQUENCE sent_mail_id_seq FROM david;
 GRANT ALL ON SEQUENCE sent_mail_id_seq TO david;
 GRANT SELECT,UPDATE ON SEQUENCE sent_mail_id_seq TO qmail;
+
+
+--
+-- Name: smtpd_connections; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE smtpd_connections FROM PUBLIC;
+REVOKE ALL ON TABLE smtpd_connections FROM david;
+GRANT ALL ON TABLE smtpd_connections TO david;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE smtpd_connections TO qmail;
+
+
+--
+-- Name: smtpd_connections_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON SEQUENCE smtpd_connections_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE smtpd_connections_id_seq FROM david;
+GRANT ALL ON SEQUENCE smtpd_connections_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE smtpd_connections_id_seq TO qmail;
 
 
 --
