@@ -87,7 +87,7 @@ class HoneyPot(ConfigMixin):
                         continue
 
                     self.process_honeypot(helo, ip_address, recipient, sender)
-            elif 'postfix/smtpd' in line and 'connect from' in line:
+            elif 'postfix/smtpd' in line and ' connect from ' in line:
                 match = CONNECT.search(line)
                 if match:
                     self.process_connect(match.group(1))
