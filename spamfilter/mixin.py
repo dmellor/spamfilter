@@ -53,7 +53,7 @@ def query_postfix_db(db, item):
         postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
         line = postmap.stdout.readline()
         postmap.wait()
-        return line.startswith('ok')
+        return line.lower().startswith('ok')
     else:
         return False
 

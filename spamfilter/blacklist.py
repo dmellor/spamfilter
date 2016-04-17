@@ -3,6 +3,7 @@ from spamfilter.greylist import GreylistPolicy
 from spamfilter.model.spam import Spam, spam_table
 from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.smtpdconnection import SmtpdConnection
+from spamfilter.mixin import query_postfix_db
 from sqlalchemy.sql import select, func, text
 
 SOFT_REJECTED = 'defer_if_permit Spam has recently been received from %s'
@@ -36,6 +37,8 @@ class BlacklistPolicy(GreylistPolicy):
             'smtpd_connection', 'suspicious_classc_threshhold', 10))
         self.suspicious_sibling_address_threshold = int(manager.get_config_item(
             'smtpd_connection', 'suspicious_sibling_address_threshold', 2))
+        self.whitelist_remote_senders = manager.get_config_item(
+            'smtpd_connection', 'whitelist_remote_senders', None)
 
     # noinspection PyAttributeOutsideInit
     def load_greylist_class(self):
@@ -86,6 +89,12 @@ class BlacklistPolicy(GreylistPolicy):
 
         if level != OK:
             return self.greylist(rcpt_to, mail_from, ip_address, status)
+
+        # If the sender is whitelisted then do not perform any more checks.
+        if self.whitelist_remote_senders and query_postfix_db(
+                self.whitelist_remote_senders,
+                self.manager.get('reverse_client_name')):
+            return ACCEPTED
 
         # Third test - check for suspicious activity from class C networks.
         classc = '.'.join(ip_address.split('.')[:3])
