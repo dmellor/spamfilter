@@ -527,6 +527,41 @@ CREATE TABLE spam_tests (
 ALTER TABLE public.spam_tests OWNER TO david;
 
 --
+-- Name: srs; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE srs (
+    id integer NOT NULL,
+    hash character varying(4) NOT NULL,
+    bounce character varying(1024) NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.srs OWNER TO david;
+
+--
+-- Name: srs_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE srs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.srs_id_seq OWNER TO david;
+
+--
+-- Name: srs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: david
+--
+
+ALTER SEQUENCE srs_id_seq OWNED BY srs.id;
+
+
+--
 -- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -621,6 +656,13 @@ ALTER TABLE ONLY smtpd_connections ALTER COLUMN id SET DEFAULT nextval('smtpd_co
 
 
 --
+-- Name: id; Type: DEFAULT; Schema: public; Owner: david
+--
+
+ALTER TABLE ONLY srs ALTER COLUMN id SET DEFAULT nextval('srs_id_seq'::regclass);
+
+
+--
 -- Name: auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -698,6 +740,22 @@ ALTER TABLE ONLY spam_recipients
 
 ALTER TABLE ONLY spam_tests
     ADD CONSTRAINT spam_tests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: srs_hash; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY srs
+    ADD CONSTRAINT srs_hash UNIQUE (hash);
+
+
+--
+-- Name: srs_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY srs
+    ADD CONSTRAINT srs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1045,6 +1103,26 @@ REVOKE ALL ON TABLE spam_tests FROM PUBLIC;
 REVOKE ALL ON TABLE spam_tests FROM david;
 GRANT ALL ON TABLE spam_tests TO david;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE spam_tests TO qmail;
+
+
+--
+-- Name: srs; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE srs FROM PUBLIC;
+REVOKE ALL ON TABLE srs FROM david;
+GRANT ALL ON TABLE srs TO david;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE srs TO qmail;
+
+
+--
+-- Name: srs_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON SEQUENCE srs_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE srs_id_seq FROM david;
+GRANT ALL ON SEQUENCE srs_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE srs_id_seq TO qmail;
 
 
 --
