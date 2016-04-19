@@ -386,6 +386,12 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                     self.non_honeypot_recipients.append(recipient)
 
     def generate_srs(self, bounce):
+        # Remove invalid characters from the sender address before generating
+        # the SRS address.
+        bounce = bounce.replace("'", '')
+        bounce = bounce.replace('"', '')
+
+        # Generate the SRS address
         sender, ampersand, domain = bounce.partition('@')
         md = hashlib.sha1()
         md.update(bounce)
