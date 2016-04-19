@@ -45,7 +45,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             self.get_config_item('greylist', 'interval', 30))
         self.trusted_ips = self.get_config_item_list('sent_mail', 'trusted_ips')
         self.pop_db = self.get_config_item('spamfilter', 'pop_db', None)
-        self.host = self.get_config_item('spamfilter', 'host')
+        self.smtphost = self.get_config_item('spamfilter', 'host')
         self.disabled_tests = []
         num = 0
         while True:
@@ -191,7 +191,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 # If the score needs to be adjusted then we must adjust
                 # the auto-whitelist scores that were updated by
                 # SpamAssassin.
-                ips, helo = get_received_ips_and_helo(msg_obj, self.host)
+                ips, helo = get_received_ips_and_helo(msg_obj, self.smtphost)
                 mail_from = parseaddr(
                     msg_obj['From'] or msg_obj['Return-Path'])[1].lower()
                 query = self.session.query(AutoWhitelist)
