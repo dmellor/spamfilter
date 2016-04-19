@@ -1,6 +1,8 @@
 import socket
 import sys
 import re
+import logging
+import traceback
 
 import spamfilter.netcmd as netcmd
 
@@ -61,8 +63,11 @@ class SmtpProxy(netcmd.NetCommand):
                 self.mail(command)
                 self.send_command_and_response(command)
             elif command[0] == 'RCPT':
-                self.rcpt(command)
-                self.send_command_and_response(command)
+                ok, rcpt = self.rcpt(command)
+                if ok:
+                    self.send_command_and_response(command)
+                else:
+                    self.unknown_user(rcpt)
             elif command[0] == 'DATA':
                 self.data(command)
 
@@ -120,6 +125,10 @@ class SmtpProxy(netcmd.NetCommand):
         code = self.code()
         self.output.writelines(['%s%s' % (code, x) for x in message])
         self.output.flush()
+
+    def unknown_user(self, rcpt):
+        self.set_status('550', 'User unknown: <%s>' % rcpt)
+        self.print_response()
 
     def xforward(self, command):
         # Extract the remote IP address and hostname and save them for logging
@@ -196,20 +205,50 @@ class SmtpProxy(netcmd.NetCommand):
         return True
 
     def mail(self, command):
-        addr_regexp = re.compile('<(.*)>')
+        addr_regexp = re.compile(r'<(.*)>')
+        i = 1
         for token in command[1:]:
             match = addr_regexp.search(token)
             if match:
                 address = match.group(1).strip()
                 if address:
                     self.bounce = address
+                    command[i] = addr_regexp.sub(
+                        '<' + self.generate_srs(address) + '>',
+                        command[i])
 
                 return
+            else:
+                i += 1
+
+    def generate_srs(self, bounce):
+        # This method is overridden in spamcheck.py to generate SRS addresses.
+        return bounce
+
+    def reverse_srs(self, address):
+        # This method is overridden in spamcheck.py to generate SRS addresses.
+        return address
 
     def rcpt(self, command):
         addr_regexp = re.compile('<(.*)>')
+        i = 1
         for token in command[1:]:
             match = addr_regexp.search(token)
             if match:
-                self.rcpt_to.append(match.group(1).lstrip().rstrip().lower())
-                return
+                rcpt = match.group(1).lstrip().rstrip()
+                if rcpt.startswith('SRS0='):
+                    actual_rcpt = self.reverse_srs(rcpt)
+                    if not actual_rcpt:
+                        return False, rcpt
+                    else:
+                        rcpt = actual_rcpt
+                        command[i] = addr_regexp.sub(
+                            '<' + rcpt + '>',
+                            command[i])
+
+                self.rcpt_to.append(rcpt.lower())
+                return True, rcpt
+            else:
+                i += 1
+
+        return False, ''

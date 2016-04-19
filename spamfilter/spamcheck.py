@@ -3,6 +3,10 @@ import socket
 import re
 import logging
 import traceback
+import hashlib
+import random
+import base64
+import time
 import email
 from email.utils import parseaddr
 
@@ -14,6 +18,7 @@ from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.sentmail import SentMail
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.receivedmail import ReceivedMail
+from spamfilter.model.srs import Srs
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 HONEYPOT = '250 Message was sent to a honeypot address'
@@ -21,6 +26,10 @@ VIRUS = '250 Message contains a virus and has been quarantined'
 UNKNOWN = '550 Unknown user'
 
 Greylist = None
+PERIOD = 60 * 60 * 24
+BASE32_CHARS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                '2', '3', '4', '5', '6', '7']
 
 
 class DisabledCharsetTests(object):
@@ -46,6 +55,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         self.trusted_ips = self.get_config_item_list('sent_mail', 'trusted_ips')
         self.pop_db = self.get_config_item('spamfilter', 'pop_db', None)
         self.smtphost = self.get_config_item('spamfilter', 'host')
+        self.domain = self.get_config_item('spamfilter', 'domain')
         self.disabled_tests = []
         num = 0
         while True:
@@ -112,6 +122,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         if err_status:
             self.error_response = "451 %s" % err_status
+            ok = False
 
         return ok
 
@@ -374,6 +385,25 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                 else:
                     self.non_honeypot_recipients.append(recipient)
 
+    def generate_srs(self, bounce):
+        sender, ampersand, domain = bounce.partition('@')
+        md = hashlib.sha1()
+        md.update(bounce)
+        md.update(str(random.random()))
+        digest = base64.b64encode(md.digest())[:4]
+        self.session.add(Srs(hash=digest, bounce=bounce))
+        return ('SRS0=' + digest + '=' + srs_timestamp() + '=' + domain + '=' +
+                sender + '@' + self.domain)
+
+    def reverse_srs(self, address):
+        hash = address.split('=')[1]
+        query = self.session.query(Srs).filter_by(hash=hash)
+        srs = query.first()
+        if not srs:
+            return None
+        else:
+            return srs.bounce
+
 
 def check_clamav(message, host, port, timeout):
     timeout = float(timeout)
@@ -444,3 +474,10 @@ def get_charset_from_message(message):
         return None
 
     return charset
+
+
+def srs_timestamp():
+    t = (int(time.time()) / PERIOD) % 1024
+    t1 = t / 32
+    t2 = t % 32
+    return BASE32_CHARS[t1] + BASE32_CHARS[t2]
