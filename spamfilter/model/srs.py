@@ -15,7 +15,8 @@ srs_table = Table(
     Column('id', Integer, Sequence('srs_id_seq'), primary_key=True),
     Column('hash', String(4), nullable=False),
     Column('bounce', String(1024), nullable=False),
-    Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
+    Column('created', TIMESTAMP, server_default=text('now()'), nullable=False),
+    UniqueConstraint('hash'))
 
 mapper(Srs, srs_table)
 
