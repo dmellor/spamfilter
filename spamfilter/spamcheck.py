@@ -391,24 +391,34 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         bounce = bounce.replace("'", '')
         bounce = bounce.replace('"', '')
 
-        # Generate the SRS address
         sender, ampersand, domain = bounce.partition('@')
-        md = hashlib.sha1()
-        md.update(bounce)
-        md.update(str(random.random()))
-        digest = base64.b64encode(md.digest())[:4]
-        self.session.add(Srs(hash=digest, bounce=bounce))
-        return ('SRS0=' + digest + '=' + srs_timestamp() + '=' + domain + '=' +
-                sender + '@' + self.domain)
+
+        # Generate the SRS address or change an existing SRS address into a
+        # multiple forwarder address.
+        match = re.search(r'^SRS[01]=(.*)', sender)
+        if match:
+            return 'SRS1=' + match.group(1) + '@' + self.domain
+        else:
+            md = hashlib.sha1()
+            md.update(bounce)
+            md.update(str(random.random()))
+            digest = base64.b64encode(md.digest())[:4]
+            self.session.add(Srs(hash=digest, bounce=bounce))
+            return ('SRS0=' + digest + '=' + srs_timestamp() + '=' + domain +
+                    '=' + sender + '@' + self.domain)
 
     def reverse_srs(self, address):
-        hash = address.split('=')[1]
-        query = self.session.query(Srs).filter_by(hash=hash)
-        srs = query.first()
-        if not srs:
-            return None
+        domain = address.split('@')[1]
+        if domain == self.domain:
+            digest = address.split('=')[1]
+            query = self.session.query(Srs).filter_by(hash=digest)
+            srs = query.first()
+            if not srs:
+                return None
+            else:
+                return srs.bounce
         else:
-            return srs.bounce
+            return None
 
 
 def check_clamav(message, host, port, timeout):

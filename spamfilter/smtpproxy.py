@@ -234,7 +234,7 @@ class SmtpProxy(netcmd.NetCommand):
             match = addr_regexp.search(token)
             if match:
                 rcpt = match.group(1).lstrip().rstrip()
-                if rcpt.startswith('SRS0='):
+                if re.search(r'^SRS[01]=', rcpt):
                     actual_rcpt = self.reverse_srs(rcpt)
                     if not actual_rcpt:
                         return False, rcpt
