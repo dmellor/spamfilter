@@ -1,8 +1,6 @@
 import socket
 import sys
 import re
-import logging
-import traceback
 
 import spamfilter.netcmd as netcmd
 
