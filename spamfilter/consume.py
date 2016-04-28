@@ -1,3 +1,4 @@
+import re
 import email
 from cStringIO import StringIO
 from email.generator import Generator
@@ -14,6 +15,7 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
         self.read_config(config)
         self.session = create_session(self.get_config_item('database', 'dburi'))
         self.host = self.get_config_item('spamfilter', 'host')
+        self.domain = self.get_config_item('spamfilter', 'domain')
 
     def report_spam(self, filename):
         message = ''.join(open(filename).readlines())
@@ -31,6 +33,10 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
         # Extract the attached message and save it in the spam table.
         bounce = parseaddr(message['Return-Path'] or message['From'])[1]
         mail_from = bounce.lower() if bounce else None
+        if mail_from and re.search(r'^SRS[01]=', mail_from):
+            mail_from = extract_original_address(mail_from, self.domain,
+                                                 self.session)
+
         ips, helo = get_received_ips_and_helo(message, self.host)
         fp = StringIO()
         g = Generator(fp, mangle_from_=False)
