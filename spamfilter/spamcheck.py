@@ -408,17 +408,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                     '=' + sender + '@' + self.domain)
 
     def reverse_srs(self, address):
-        domain = address.split('@')[1]
-        if domain == self.domain:
-            digest = address.split('=')[1]
-            query = self.session.query(Srs).filter_by(hash=digest)
-            srs = query.first()
-            if not srs:
-                return None
-            else:
-                return srs.bounce
-        else:
-            return None
+        return extract_original_address(address, self.domain, self.session)
 
 
 def check_clamav(message, host, port, timeout):
