@@ -128,7 +128,11 @@ def extract_message_body(contents):
     message = email.message_from_string(contents)
     body, content_type, charset = get_body_type_charset(message)
     if charset:
-        body = body.decode(charset).encode('utf8')
+        try:
+            body = body.decode(charset).encode('utf8')
+        except UnicodeDecodeError:
+            # If the email was badly encoded we simply use the unmodified body.
+            pass
 
     if content_type == 'text/html':
         from subprocess import Popen, PIPE
