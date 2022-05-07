@@ -269,6 +269,34 @@ CREATE TABLE domain_names (
 ALTER TABLE public.domain_names OWNER TO david;
 
 --
+-- Name: filtered_id_seq; Type: SEQUENCE; Schema: public; Owner: david
+--
+
+CREATE SEQUENCE filtered_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.filtered_id_seq OWNER TO david;
+
+--
+-- Name: filtered; Type: TABLE; Schema: public; Owner: david; Tablespace: 
+--
+
+CREATE TABLE filtered (
+    id integer DEFAULT nextval('filtered_id_seq'::regclass) NOT NULL,
+    recipient character varying(1024) NOT NULL,
+    contents text,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.filtered OWNER TO david;
+
+--
 -- Name: greylist_id_seq; Type: SEQUENCE; Schema: public; Owner: david
 --
 
@@ -679,6 +707,14 @@ ALTER TABLE ONLY domain_names
 
 
 --
+-- Name: filtered_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
+--
+
+ALTER TABLE ONLY filtered
+    ADD CONSTRAINT filtered_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: greylist_pkey; Type: CONSTRAINT; Schema: public; Owner: david; Tablespace: 
 --
 
@@ -953,6 +989,26 @@ REVOKE ALL ON TABLE domain_names FROM PUBLIC;
 REVOKE ALL ON TABLE domain_names FROM david;
 GRANT ALL ON TABLE domain_names TO david;
 GRANT SELECT ON TABLE domain_names TO qmail;
+
+
+--
+-- Name: filtered_id_seq; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON SEQUENCE filtered_id_seq FROM PUBLIC;
+REVOKE ALL ON SEQUENCE filtered_id_seq FROM david;
+GRANT ALL ON SEQUENCE filtered_id_seq TO david;
+GRANT SELECT,UPDATE ON SEQUENCE filtered_id_seq TO qmail;
+
+
+--
+-- Name: filtered; Type: ACL; Schema: public; Owner: david
+--
+
+REVOKE ALL ON TABLE filtered FROM PUBLIC;
+REVOKE ALL ON TABLE filtered FROM david;
+GRANT ALL ON TABLE filtered TO david;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE filtered TO qmail;
 
 
 --
