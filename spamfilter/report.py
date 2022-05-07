@@ -94,6 +94,7 @@ class ReportGenerator(ConfigMixin):
         server_name = result[0] if result else domain
 
         # Construct and send the report.
+        # noinspection PyUnresolvedReferences
         cur_date = mx.DateTime.now()
         msg_text = self.template.render(
             domain=domain, host=host, server_name=server_name,
