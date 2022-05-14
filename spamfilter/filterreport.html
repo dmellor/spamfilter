@@ -1,0 +1,75 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Filter report</title>
+</head>
+<body bgcolor="#FFFFFF">
+<font face="Arial, Helvetica, sans-serif" size="-1">
+<b>Filtered Messages on the ${server_name} Mail Server</b>
+<p>Click on a view button to examine the contents of a message.</p>
+<p>Click on a deliver button to deliver the message to the recipient.</p>
+<p>Filtered messages will be automatically deleted after 14 days.</p>
+</font>
+<br>
+<table width="100%" cellspacing="0" cellpadding="1" border="0">
+<tr bgcolor="#FFFFFF">
+<td width="30%">
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#666666">
+<b>Filtered Messages</b>
+</font>
+</td>
+<td width="40%">
+<font face="Arial, Helvetica, sans-serif" size="-2">
+${len(filtered)} ${'Messages' if len(filtered) > 1 else 'Message'}
+</font>
+</td>
+<td width="20%">
+&nbsp;</td>
+<td>&nbsp;</td></tr>
+<tr bgcolor="#666666">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>From</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Subject</b>
+</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1" color="#FFFFFF">
+<b>Date</b></font></td><td></td><td></td></tr>
+
+<% i = 0 %>
+% for msg in filtered:
+<%
+colour = '#FFFFFF' if i & 1 else '#EEEEEE'
+i += 1
+%>
+<tr bgcolor="${colour}">
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.sender}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.subject}</font>
+</td>
+<td>
+<font face="Arial, Helvetica, sans-serif" size="-1">${msg.date}</font>
+</td>
+<td>
+<form action="${url_prefix}/viewfiltered/${msg.id}" method="GET">
+<input type="submit" value="View"/>
+</form>
+</td>
+<td>
+<form action="${url_prefix}/deliverfiltered/${msg.id}" method="POST">
+<input type="submit" value="Deliver"/>
+</form>
+</td>
+</tr>
+% endfor
+
+</table>
+</body>
+</html>

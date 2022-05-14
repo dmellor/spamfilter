@@ -16,6 +16,17 @@ filtered_table = Table(
     Column('contents', TEXT, nullable=True),
     Column('created', TIMESTAMP, server_default=text('now()'), nullable=False))
 
-mapper(Filtered, filtered_table)
+mapper(Filtered, filtered_table,
+       properties={
+           'contents': deferred(filtered_table.c.contents),
+           'subject': column_property(
+               func.extract_header(text("'Subject'"),
+                                   filtered_table.c.contents).label('subject'),
+               deferred=True),
+           'sender': column_property(
+               func.extract_header(text("'From'"),
+                                   filtered_table.c.contents).label('sender'),
+               deferred=True)
+       })
 
 __all__ = ['Filtered', 'filtered_table']

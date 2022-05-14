@@ -1,0 +1,20 @@
+#!/bin/sh
+
+umask 002
+directory=${0%/*}
+cd $directory
+if [ -z "$1" ]; then
+    config=config.ini
+else
+    config="$1"
+fi
+
+ARGS='config=sys.argv[1]'
+
+. bin/activate
+exec python -c "
+import sys
+sys.argv[0] = 'listfiltered'
+from spamfilter.filterreport import FilterReportGenerator
+FilterReportGenerator($ARGS).list_messages()
+sys.exit(0)" "$config"
