@@ -19,6 +19,15 @@ class Filter(ConfigMixin):
     def filter_message(self, recipient, filter_file):
         original_message = sys.stdin.read()
         sys.stdin.close()
+
+        # Do not filter spam summary messages
+        nofilter = self.get_config_item('filter', 'nofilter', None)
+        if nofilter:
+            prefix = 'From ' + nofilter
+            if original_message.startswith(prefix):
+                deliver_message(recipient, original_message)
+                return
+
         message = email.message_from_string(original_message)
         body = extract_text_content(message)
 
