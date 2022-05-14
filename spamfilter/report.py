@@ -6,20 +6,13 @@ import time
 import mx.DateTime
 from mx.DateTime.ARPA import str as rfc822str
 from sqlalchemy import select, text
-import codecs
-from email.header import decode_header
 import traceback
 
-from spamfilter.mixin import ConfigMixin, create_session
+from spamfilter.mixin import ConfigMixin, create_session, MessageSummary
+from spamfilter.mixin import translate
 from spamfilter.model.spam import SpamRecipient, spam_recipients_table
 from spamfilter.model.virus import VirusRecipient, virus_recipients_table
 from mako.template import Template
-
-
-class MessageSummary(object):
-    def __init__(self, **kws):
-        for k, v in kws.items():
-            setattr(self, k, v)
 
 
 class ReportGenerator(ConfigMixin):
@@ -139,43 +132,3 @@ def create_delivery_id(message, recipient):
             break
 
     return delivery_id
-
-
-# This function tries to convert the text to Unicode. If that fails, then an
-# ascii-encoded string will be returned.
-def translate(txt):
-    txt = _translate(txt)
-
-    # Some email headers are incorrectly encoded. If the text was not encoded
-    # according to RFC 2047, then we attempt to decode it to Unicode assuming
-    # that the encoding is utf8. If that fails then we convert the text to
-    # ascii encoding by deleting all non-ascii characters from the text.
-    if not isinstance(txt, unicode):
-        try:
-            txt = txt.decode('utf8')
-        except:
-            txt = ''.join([x for x in txt if ord(x) < 128])
-
-    return txt
-
-
-# Transform the text according to RFC 2047.
-def _translate(txt):
-    if txt:
-        try:
-            chunks = decode_header(txt)
-            translated = []
-            for chunk in chunks:
-                if chunk[1]:
-                    translated.append(codecs.getdecoder(chunk[1])(chunk[0])[0])
-                else:
-                    translated.append(unicode(chunk[0]))
-
-            return u''.join(translated)
-        except:
-            return txt
-    else:
-        # If the text was None, it is converted to an empty string in order to
-        # prevent 'NoneType' object is not iterable when the return value of
-        # this function is treated as a string.
-        return '' if txt is None else txt

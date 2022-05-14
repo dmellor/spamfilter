@@ -6,7 +6,7 @@ from email.utils import parseaddr
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
 from spamfilter.model.autowhitelist import AutoWhitelist
-from spamfilter.report import translate
+from spamfilter.mixin import translate, get_body_type_charset
 
 
 class Deliver(ConfigMixin):
@@ -148,31 +148,6 @@ def extract_message_body(contents):
     return fix_long_paragraphs(body)
 
 
-def get_body_type_charset(message):
-    payload = message.get_payload()
-    content_type = message.get_content_type()
-    charset = message.get_param('charset')
-    body = None
-    if not isinstance(payload, list):
-        if content_type in ('text/plain', 'text/html'):
-            body = payload
-            transfer_encoding = message.get('Content-Transfer-Encoding', '')
-            transfer_encoding = transfer_encoding.lower()
-            if transfer_encoding == 'quoted-printable':
-                import quopri
-                body = quopri.decodestring(body)
-            elif transfer_encoding == 'base64':
-                import base64
-                body = base64.b64decode(body)
-    else:
-        for msg in payload:
-            body, content_type, charset = get_body_type_charset(msg)
-            if body:
-                break
-
-    return body, content_type, charset
-
-
 def fix_long_paragraphs(body):
     from textwrap import TextWrapper
     wrapper = TextWrapper(width=120, break_long_words=False)
@@ -222,6 +197,7 @@ def success():
     print "<body>"
     print "<h2>Your message has been queued for delivery to your mailbox.</h2>"
     print "</body></html>"
+
 
 if __name__ == "__main__":
     Deliver().process()

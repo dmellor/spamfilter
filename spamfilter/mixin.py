@@ -1,4 +1,6 @@
+import codecs
 import re
+from email.header import decode_header
 from subprocess import *
 from spamfilter.model.srs import Srs
 
@@ -75,7 +77,7 @@ def get_received_ips_and_helo(message, host):
                 if not helo:
                     helo = match.group(1)
 
-                # Find all of the IP addresses on the received line.
+                # Find all the IP addresses on the received line.
                 for match in re.finditer(
                         r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\D', line):
                     ips.append(match.group(1))
@@ -137,6 +139,88 @@ def extract_original_address(address, domain, session):
         return None
 
 
+class MessageSummary(object):
+    def __init__(self, **kws):
+        for k, v in kws.items():
+            setattr(self, k, v)
+
+
+# This function tries to convert the text to Unicode. If that fails, then an
+# ascii-encoded string will be returned.
+def translate(txt):
+    txt = _translate(txt)
+
+    # Some email headers are incorrectly encoded. If the text was not encoded
+    # according to RFC 2047, then we attempt to decode it to Unicode assuming
+    # that the encoding is utf8. If that fails then we convert the text to
+    # ascii encoding by deleting all non-ascii characters from the text.
+    if not isinstance(txt, unicode):
+        try:
+            txt = txt.decode('utf8')
+        except:
+            txt = ''.join([x for x in txt if ord(x) < 128])
+
+    return txt
+
+
+# Transform the text according to RFC 2047.
+def _translate(txt):
+    if txt:
+        try:
+            chunks = decode_header(txt)
+            translated = []
+            for chunk in chunks:
+                if chunk[1]:
+                    translated.append(codecs.getdecoder(chunk[1])(chunk[0])[0])
+                else:
+                    translated.append(unicode(chunk[0]))
+
+            return u''.join(translated)
+        except:
+            return txt
+    else:
+        # If the text was None, it is converted to an empty string in order to
+        # prevent 'NoneType' object is not iterable when the return value of
+        # this function is treated as a string.
+        return '' if txt is None else txt
+
+
+def get_body_type_charset(message, force_html=False):
+    if force_html:
+        allowed_types = ['text/html']
+    else:
+        allowed_types = ['text/plain', 'text/html']
+
+    return _get_body_type_charset(message, allowed_types)
+
+
+def _get_body_type_charset(message, allowed_types):
+    payload = message.get_payload()
+    content_type = message.get_content_type()
+    charset = message.get_param('charset')
+    body = None
+    if not isinstance(payload, list):
+        if content_type in allowed_types:
+            body = payload
+            transfer_encoding = message.get('Content-Transfer-Encoding', '')
+            transfer_encoding = transfer_encoding.lower()
+            if transfer_encoding == 'quoted-printable':
+                import quopri
+                body = quopri.decodestring(body)
+            elif transfer_encoding == 'base64':
+                import base64
+                body = base64.b64decode(body)
+    else:
+        for msg in payload:
+            body, content_type, charset = _get_body_type_charset(msg,
+                                                                 allowed_types)
+            if body:
+                break
+
+    return body, content_type, charset
+
+
 __all__ = ['ConfigMixin', 'create_session', 'get_dkim_domain',
            'get_received_ips_and_helo', 'is_dkim_verified', 'query_postfix_db',
-           'Session', 'extract_original_address']
+           'Session', 'extract_original_address', 'MessageSummary',
+           'translate', 'get_body_type_charset']
