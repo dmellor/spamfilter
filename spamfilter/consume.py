@@ -70,4 +70,4 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
 
             processed_classbs[classb] = True
             for record in query.filter_by(ip=classb).all():
-                record.totscore += record.count * 1000
+                record.totscore += record.msgcount * 1000

@@ -313,10 +313,10 @@ class SpamCheck(SmtpProxy, ConfigMixin):
             record = query.first()
             if record:
                 record.totscore += score
-                record.count += 1
+                record.msgcount += 1
             else:
                 record = AutoWhitelist(username='GLOBAL', email=mail_from,
-                                       ip=classb, count=1, totscore=score,
+                                       ip=classb, msgcount=1, totscore=score,
                                        signedby=dkim_domain)
                 self.session.add(record)
 
