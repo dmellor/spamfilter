@@ -1,5 +1,4 @@
 from subprocess import *
-import socket
 import re
 import logging
 import traceback
@@ -245,10 +244,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
     def check_virus(self, message):
         # Check the message against the ClamAV server.
-        host = self.get_config_item('spamfilter', 'clamav_server', 'localhost')
-        port = self.get_config_item('spamfilter', 'clamav_port', 3310)
-        timeout = self.get_config_item('spamfilter', 'clamav_timeout', 30)
-        virus_type = check_clamav(message, host, port, timeout)
+        virus_type = check_clamav(message)
         if virus_type:
             # The message is a virus and must be quarantined.
             virus = Virus(bounce=self.bounce, helo=self.remote_host,
@@ -411,30 +407,20 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         return extract_original_address(address, self.domain, self.session)
 
 
-def check_clamav(message, host, port, timeout):
-    timeout = float(timeout)
-    port = int(port)
-
-    # Open a socket to the CLAMAV daemon.
+def check_clamav(message):
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((host, port))
-        s.settimeout(timeout)
-        s.sendall('STREAM\n')
-        response = s.recv(1024)
-
-        # Determine the port to connect to for the virus check.
-        port = re.search(r'PORT\s+(\d+)', response).group(1)
-        stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        stream.connect((host, int(port)))
-        stream.settimeout(timeout)
-        stream.sendall(message)
-        stream.close()
-
-        # Read the response from the server.
-        response = s.recv(1024)
-        match = re.search(r'(\S+)\s+FOUND$', response)
-        return match.group(1) if match else None
+        process = Popen(
+            ['clamdscan', '-w', '-'], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        process.stdin.write(message)
+        process.stdin.close()
+        response = process.stdout.readline()
+        ret_code = process.wait()
+        if ret_code == 0:
+            return None
+        elif ret_code == 1:
+            return re.search(r'(\S+)\s+FOUND$', response).group(1)
+        else:
+            raise Exception('ClamAV scan failed: return code %s' % ret_code)
     except Exception, exc:
         error_message = re.sub(r'\r?\n', ' ', str(exc))
         logging.info('virus check failed: %s', error_message)
