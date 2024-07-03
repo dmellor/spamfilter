@@ -211,9 +211,10 @@ class SmtpProxy(netcmd.NetCommand):
                 address = match.group(1).strip()
                 if address:
                     self.bounce = address
-                    command[i] = addr_regexp.sub(
-                        '<' + self.generate_srs(address) + '>',
-                        command[i])
+                    if self.using_srs():
+                        command[i] = addr_regexp.sub(
+                            '<' + self.generate_srs(address) + '>',
+                            command[i])
 
                 return
             else:
@@ -226,6 +227,10 @@ class SmtpProxy(netcmd.NetCommand):
     def reverse_srs(self, address):
         # This method is overridden in spamcheck.py to generate SRS addresses.
         return address
+
+    def using_srs(self):
+        # This method is overridden in spamcheck.py to generate SRS addresses.
+        return False
 
     def rcpt(self, command):
         addr_regexp = re.compile('<(.*)>')

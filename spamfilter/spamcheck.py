@@ -56,6 +56,7 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         self.smtphost = self.get_config_item('spamfilter', 'host')
         self.domain = self.get_config_item('spamfilter', 'domain')
         self.disabled_tests = []
+        self.is_srs_enabled = self.get_config_item('spamfilter', 'using_srs', None)
         num = 0
         while True:
             num += 1
@@ -405,6 +406,9 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
     def reverse_srs(self, address):
         return extract_original_address(address, self.domain, self.session)
+
+    def using_srs(self):
+        return self.is_srs_enabled
 
 
 def check_clamav(message):
