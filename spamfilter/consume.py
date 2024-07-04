@@ -32,7 +32,7 @@ class SpamConsumer(EmailExtractor, ConfigMixin):
     def save_spam(self, message):
         # Extract the attached message and save it in the spam table.
         bounce = parseaddr(message['Return-Path'] or message['From'])[1]
-        if bounce and re.search(r'^SRS[01]=', bounce):
+        if bounce and re.search(r'^SRS[01]=', bounce, re.I):
             tmp = extract_original_address(bounce, self.domain,
                                            self.session)
             if tmp:

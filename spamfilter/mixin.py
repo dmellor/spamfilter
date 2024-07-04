@@ -128,7 +128,7 @@ def is_dkim_verified(original_message):
 def extract_original_address(address, domain, session):
     address_domain = address.split('@')[1]
     if address_domain == domain:
-        digest = address.split('=')[1]
+        digest = address.split('=')[1].lower()
         query = session.query(Srs).filter_by(hash=digest)
         srs = query.first()
         if not srs:

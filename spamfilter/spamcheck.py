@@ -392,14 +392,14 @@ class SpamCheck(SmtpProxy, ConfigMixin):
 
         # Generate the SRS address or change an existing SRS address into a
         # multiple forwarder address.
-        match = re.search(r'^SRS[01]=(.*)', sender)
+        match = re.search(r'^SRS[01]=(.*)', sender, re.I)
         if match:
             return 'SRS1=' + match.group(1) + '@' + self.domain
         else:
             md = hashlib.sha1()
             md.update(bounce)
             md.update(str(random.random()))
-            digest = base64.b64encode(md.digest())[:4]
+            digest = base64.b64encode(md.digest())[:4].lower()
             self.session.add(Srs(hash=digest, bounce=bounce))
             return ('SRS0=' + digest + '=' + srs_timestamp() + '=' + domain +
                     '=' + sender + '@' + self.domain)
