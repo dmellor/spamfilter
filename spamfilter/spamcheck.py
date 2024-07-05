@@ -5,7 +5,6 @@ import traceback
 import hashlib
 import random
 import base64
-import time
 import email
 from email.utils import parseaddr
 
@@ -25,10 +24,6 @@ VIRUS = '250 Message contains a virus and has been quarantined'
 UNKNOWN = '550 Unknown user'
 
 Greylist = None
-PERIOD = 60 * 60 * 24
-BASE32_CHARS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                '2', '3', '4', '5', '6', '7']
 
 
 class DisabledCharsetTests(object):
@@ -470,10 +465,3 @@ def get_charset_from_message(message):
         return None
 
     return charset
-
-
-def srs_timestamp():
-    t = (int(time.time()) / PERIOD) % 1024
-    t1 = t / 32
-    t2 = t % 32
-    return BASE32_CHARS[t1] + BASE32_CHARS[t2]

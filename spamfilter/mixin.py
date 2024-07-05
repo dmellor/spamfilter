@@ -1,10 +1,18 @@
 import codecs
 import re
+import hashlib
+import base64
+import random
+import time
 from email.header import decode_header
 from subprocess import *
 from spamfilter.model.srs import Srs
 
 Session = None
+PERIOD = 60 * 60 * 24
+BASE32_CHARS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                '2', '3', '4', '5', '6', '7']
 
 
 class ConfigMixin(object):
@@ -59,6 +67,13 @@ def query_postfix_db(db, item):
         return line.lower().startswith('ok')
     else:
         return False
+
+
+def get_postfix_db_value(db, item):
+    postmap = Popen(['/usr/sbin/postmap', '-q', item, db], stdout=PIPE)
+    line = postmap.stdout.readline()
+    postmap.wait()
+    return line
 
 
 def get_received_ips_and_helo(message, host):
@@ -220,7 +235,25 @@ def _get_body_type_charset(message, allowed_types):
     return body, content_type, charset
 
 
+def generate_srs_address(address, forward_domain):
+    sender, _, domain = address.partition('@')
+    md = hashlib.sha1()
+    md.update(address)
+    md.update(str(random.random()))
+    digest = base64.b64encode(md.digest())[:4]
+    return 'SRS0=%s=%s=%s=%s@%s' % (digest, srs_timestamp(), domain, sender,
+                                    forward_domain)
+
+
+def srs_timestamp():
+    t = (int(time.time()) / PERIOD) % 1024
+    t1 = t / 32
+    t2 = t % 32
+    return BASE32_CHARS[t1] + BASE32_CHARS[t2]
+
+
 __all__ = ['ConfigMixin', 'create_session', 'get_dkim_domain',
            'get_received_ips_and_helo', 'is_dkim_verified', 'query_postfix_db',
            'Session', 'extract_original_address', 'MessageSummary',
-           'translate', 'get_body_type_charset']
+           'translate', 'get_body_type_charset', 'generate_srs_address',
+           'srs_timestamp', 'get_postfix_db_value']
