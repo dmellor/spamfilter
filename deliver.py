@@ -35,7 +35,8 @@ class Deliver(ConfigMixin):
 
             spam = self.session.query(Spam).get(spam_recipient.spam_id)
             if method == 'GET':
-                confirm('http://' + os.getenv('SERVER_NAME') +
+                protocol = 'https://' if os.getenv('HTTPS') else 'http://'
+                confirm(protocol + os.getenv('SERVER_NAME') +
                         os.getenv('SCRIPT_NAME') + os.getenv('PATH_INFO'),
                         spam)
             else:
