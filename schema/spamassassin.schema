@@ -552,41 +552,6 @@ CREATE TABLE public.spam_tests (
 ALTER TABLE public.spam_tests OWNER TO david;
 
 --
--- Name: srs; Type: TABLE; Schema: public; Owner: david
---
-
-CREATE TABLE public.srs (
-    id integer NOT NULL,
-    hash character varying(4) NOT NULL,
-    bounce character varying(1024) NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.srs OWNER TO david;
-
---
--- Name: srs_id_seq; Type: SEQUENCE; Schema: public; Owner: david
---
-
-CREATE SEQUENCE public.srs_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.srs_id_seq OWNER TO david;
-
---
--- Name: srs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: david
---
-
-ALTER SEQUENCE public.srs_id_seq OWNED BY public.srs.id;
-
-
---
 -- Name: virus_recipients; Type: TABLE; Schema: public; Owner: david
 --
 
@@ -681,13 +646,6 @@ ALTER TABLE ONLY public.smtpd_connections ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
--- Name: srs id; Type: DEFAULT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY public.srs ALTER COLUMN id SET DEFAULT nextval('public.srs_id_seq'::regclass);
-
-
---
 -- Name: auto_whitelist auto_whitelist_pkey; Type: CONSTRAINT; Schema: public; Owner: david
 --
 
@@ -773,22 +731,6 @@ ALTER TABLE ONLY public.spam_recipients
 
 ALTER TABLE ONLY public.spam_tests
     ADD CONSTRAINT spam_tests_pkey PRIMARY KEY (id);
-
-
---
--- Name: srs srs_hash; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY public.srs
-    ADD CONSTRAINT srs_hash UNIQUE (hash);
-
-
---
--- Name: srs srs_pkey; Type: CONSTRAINT; Schema: public; Owner: david
---
-
-ALTER TABLE ONLY public.srs
-    ADD CONSTRAINT srs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1074,20 +1016,6 @@ GRANT SELECT,UPDATE ON SEQUENCE public.spam_tests_id_seq TO qmail;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.spam_tests TO qmail;
-
-
---
--- Name: TABLE srs; Type: ACL; Schema: public; Owner: david
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.srs TO qmail;
-
-
---
--- Name: SEQUENCE srs_id_seq; Type: ACL; Schema: public; Owner: david
---
-
-GRANT SELECT,UPDATE ON SEQUENCE public.srs_id_seq TO qmail;
 
 
 --

@@ -16,7 +16,6 @@ from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.sentmail import SentMail
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.model.receivedmail import ReceivedMail
-from spamfilter.model.srs import Srs
 
 SPAM = '250 Message was identified as spam and has been quarantined'
 HONEYPOT = '250 Message was sent to a honeypot address'
@@ -51,7 +50,6 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         self.smtphost = self.get_config_item('spamfilter', 'host')
         self.domain = self.get_config_item('spamfilter', 'domain')
         self.disabled_tests = []
-        self.is_srs_enabled = self.get_config_item('spamfilter', 'using_srs', None)
         num = 0
         while True:
             num += 1
@@ -376,35 +374,6 @@ class SpamCheck(SmtpProxy, ConfigMixin):
                     self.is_to_honeypot = True
                 else:
                     self.non_honeypot_recipients.append(recipient)
-
-    def generate_srs(self, bounce):
-        # Remove invalid characters from the sender address before generating
-        # the SRS address.
-        bounce = bounce.replace("'", '')
-        bounce = bounce.replace('"', '')
-
-        sender, ampersand, domain = bounce.partition('@')
-
-        # Generate the SRS address or change an existing SRS address into a
-        # multiple forwarder address.
-        match = re.search(r'^SRS[01]=(.*)', sender, re.I)
-        if match:
-            return 'SRS1=' + match.group(1) + '@' + self.domain
-        else:
-            md = hashlib.sha1()
-            md.update(bounce)
-            md.update(str(random.random()))
-            digest = base64.b64encode(md.digest())[:4].lower()
-            self.session.add(Srs(hash=digest, bounce=bounce))
-            return ('SRS0=' + digest + '=' + srs_timestamp() + '=' + domain +
-                    '=' + sender + '@' + self.domain)
-
-    def reverse_srs(self, address):
-        return extract_original_address(address, self.domain, self.session)
-
-    def using_srs(self):
-        return self.is_srs_enabled
-
 
 def check_clamav(message):
     try:

@@ -6,7 +6,6 @@ import random
 import time
 from email.header import decode_header
 from subprocess import *
-from spamfilter.model.srs import Srs
 
 Session = None
 PERIOD = 60 * 60 * 24
@@ -140,20 +139,6 @@ def is_dkim_verified(original_message):
     return result == 'pass'
 
 
-def extract_original_address(address, domain, session):
-    address_domain = address.split('@')[1]
-    if address_domain == domain:
-        digest = address.split('=')[1].lower()
-        query = session.query(Srs).filter_by(hash=digest)
-        srs = query.first()
-        if not srs:
-            return None
-        else:
-            return srs.bounce
-    else:
-        return None
-
-
 class MessageSummary(object):
     def __init__(self, **kws):
         for k, v in kws.items():
@@ -254,6 +239,5 @@ def srs_timestamp():
 
 __all__ = ['ConfigMixin', 'create_session', 'get_dkim_domain',
            'get_received_ips_and_helo', 'is_dkim_verified', 'query_postfix_db',
-           'Session', 'extract_original_address', 'MessageSummary',
-           'translate', 'get_body_type_charset', 'generate_srs_address',
-           'srs_timestamp', 'get_postfix_db_value']
+           'Session', 'MessageSummary', 'translate', 'get_body_type_charset',
+           'generate_srs_address', 'srs_timestamp', 'get_postfix_db_value']
