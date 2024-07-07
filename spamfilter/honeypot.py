@@ -18,8 +18,12 @@ CONNECT = re.compile(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]$')
 Greylist = None
 
 
-def become_daemon():
-    if os.fork():
+def become_daemon(pid_file):
+    pid = os.fork()
+    if pid:
+        f = open(pid_file, 'w')
+        f.write('%s\n' % pid)
+        f.close()
         sys.exit()
 
     os.setsid()
@@ -46,9 +50,10 @@ class HoneyPot(ConfigMixin):
         self.read_config(config)
         Greylist = create_greylist_class(
             self.get_config_item('greylist', 'interval', 30))
+        self.pid_file = self.get_config_item('honeypot', 'pid_file')
 
     def run(self):
-        become_daemon()
+        become_daemon(self.pid_file)
         try:
             self._run()
         except:

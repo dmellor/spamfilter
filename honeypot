@@ -14,7 +14,7 @@ ARGS='config=sys.argv[1]'
 [ -n "$EXTRA_ARGS" ] && ARGS="$ARGS, $EXTRA_ARGS"
 
 . bin/activate
-python -c "
+exec python -c "
 import sys
 sys.argv[0] = 'honeypot'
 from spamfilter.honeypot import HoneyPot
