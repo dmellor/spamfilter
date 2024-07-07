@@ -9,11 +9,14 @@ from spamfilter.mixin import *
 from spamfilter.model.spam import Spam
 from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.smtpdconnection import SmtpdConnection
+from spamfilter.model.login import Login
 
 UNKNOWN = re.compile(r'RCPT from ([^\[]+)\[([^\]]+)')
 RECIPIENT = re.compile(r'to=<([^>]+)')
 SENDER = re.compile(r'from=<([^>]+)')
 CONNECT = re.compile(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]$')
+LOGIN = re.compile(r': LOGIN, user=([^,]+), ip=\[(.+)\]')
+IP = re.compile(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})')
 
 Greylist = None
 
@@ -42,7 +45,9 @@ class HoneyPot(ConfigMixin):
     attempts are made to send messages to unknown addresses, and adds them to
     the honeypot address list as well as adding an entry to the spam table so
     that the contents of successive delivery attempts to a honeypot address are
-    recorded in the spam table.
+    recorded in the spam table. This class also logs verified logins to the
+    Courier IMAP/POP server, so that email from verified users is not passed
+    through the spam filter.
     """
 
     def __init__(self, config):
@@ -96,6 +101,17 @@ class HoneyPot(ConfigMixin):
                 match = CONNECT.search(line)
                 if match:
                     self.process_connect(match.group(1))
+            elif 'imapd' in line or 'pop3d' in line:
+                match = LOGIN.search(line)
+                if match:
+                    user = match.group(1)
+                    ip = match.group(2)
+                    ip_match = IP.search(ip)
+                    if ip_match:
+                        ip = ip_match.group(1)
+                        login = Login(username=user, ip_address=ip)
+                        self.session.add(login)
+                        self.session.commit()
 
     def process_honeypot(self, helo, ip_address, recipient, sender):
         spam = Spam(bounce=sender, ip_address=ip_address, helo=helo,
