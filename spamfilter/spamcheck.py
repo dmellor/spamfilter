@@ -46,7 +46,6 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         Greylist = create_greylist_class(
             self.get_config_item('greylist', 'interval', 30))
         self.trusted_ips = self.get_config_item_list('sent_mail', 'trusted_ips')
-        self.pop_db = self.get_config_item('spamfilter', 'pop_db', None)
         self.smtphost = self.get_config_item('spamfilter', 'host')
         self.domain = self.get_config_item('spamfilter', 'domain')
         self.disabled_tests = []
@@ -272,8 +271,8 @@ class SpamCheck(SmtpProxy, ConfigMixin):
         # before SMTP table, then we do not want to perform any checks as this
         # is mail that is being sent from this host.
         is_sent_mail = self.remote_addr in self.trusted_ips
-        if not is_sent_mail and self.pop_db:
-            is_sent_mail = query_postfix_db(self.pop_db, self.remote_addr)
+        if not is_sent_mail:
+            is_sent_mail = is_login(self.session, self.remote_addr)
 
         if is_sent_mail and self.bounce:
             mail_from = self.bounce.lower()

@@ -6,6 +6,7 @@ import random
 import time
 from email.header import decode_header
 from subprocess import *
+from spamfilter.model.login import Login
 
 Session = None
 PERIOD = 60 * 60 * 24
@@ -56,6 +57,12 @@ def create_session(dburi, serializable=True):
     connection.execute(stmt % mode)
     session.commit()
     return session
+
+
+def is_login(session, ip):
+    query = session.query(Login)
+    query = query.filter_by(ip_address=ip)
+    return query.first()
 
 
 def query_postfix_db(db, item):
@@ -240,4 +247,5 @@ def srs_timestamp():
 __all__ = ['ConfigMixin', 'create_session', 'get_dkim_domain',
            'get_received_ips_and_helo', 'is_dkim_verified', 'query_postfix_db',
            'Session', 'MessageSummary', 'translate', 'get_body_type_charset',
-           'generate_srs_address', 'srs_timestamp', 'get_postfix_db_value']
+           'generate_srs_address', 'srs_timestamp', 'get_postfix_db_value',
+           'is_login']

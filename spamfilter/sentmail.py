@@ -1,6 +1,6 @@
 from spamfilter.model.sentmail import SentMail
 from spamfilter.policy import Policy, ACCEPTED
-from spamfilter.mixin import query_postfix_db
+from spamfilter.mixin import query_postfix_db, is_login
 
 
 class SentMailPolicy(Policy):
@@ -8,13 +8,12 @@ class SentMailPolicy(Policy):
         super(SentMailPolicy, self).__init__(manager)
         self.trusted_ips = manager.get_config_item_list('sent_mail',
                                                         'trusted_ips')
-        self.pop_db = manager.get_config_item('spamfilter', 'pop_db', None)
 
     def process_request(self):
         ip = self.manager.get('client_address')
         accepted = ip in self.trusted_ips
-        if not accepted and self.pop_db:
-            accepted = query_postfix_db(self.pop_db, ip)
+        if not accepted:
+            accepted = is_login(self.manager.session, ip)
 
         if accepted:
             sender = self.manager.get('sender') or None

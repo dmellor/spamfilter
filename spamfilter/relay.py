@@ -18,6 +18,8 @@ class Relay(SmtpProxy, ConfigMixin):
     def __init__(self, config, **kws):
         super(Relay, self).__init__(**kws)
         self.read_config(config)
+        self.session = create_session(
+            self.get_config_item('database', 'dburi'), serializable=False)
         self.xclient_command = ['XCLIENT']
         self.xclient_helo = None
         self.xclient_name = None
@@ -69,8 +71,7 @@ class Relay(SmtpProxy, ConfigMixin):
             # response before issuing the mail command.
             name = None
             send_commands = True
-            pop_db = self.get_config_item('spamfilter', 'pop_db', None)
-            if pop_db and query_postfix_db(pop_db, self.remote_addr):
+            if is_login(self.session, self.remote_addr):
                 send_commands = False
             else:
                 name = self.xclient_helo or self.xclient_name
