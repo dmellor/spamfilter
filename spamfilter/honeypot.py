@@ -10,6 +10,7 @@ from spamfilter.model.spam import Spam
 from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.smtpdconnection import SmtpdConnection
 from spamfilter.model.login import Login
+from spamfilter.model.loginfailures import LoginFailure
 
 UNKNOWN = re.compile(r'RCPT from ([^\[]+)\[([^\]]+)')
 RECIPIENT = re.compile(r'to=<([^>]+)')
@@ -17,6 +18,7 @@ SENDER = re.compile(r'from=<([^>]+)')
 CONNECT = re.compile(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]$')
 LOGIN = re.compile(r': LOGIN, user=([^,]+), ip=\[(.+)\]')
 IP = re.compile(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})')
+FAILED_IP = re.compile(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\: SASL')
 
 Greylist = None
 
@@ -112,6 +114,13 @@ class HoneyPot(ConfigMixin):
                         login = Login(username=user, ip_address=ip)
                         self.session.add(login)
                         self.session.commit()
+            elif 'SASL LOGIN authentication failed:' in line:
+                match = FAILED_IP.search(line)
+                if match:
+                    ip = match.group(1)
+                    login_failure = LoginFailure(ip_address=ip)
+                    self.session.add(login_failure)
+                    self.session.commit()
 
     def process_honeypot(self, helo, ip_address, recipient, sender):
         spam = Spam(bounce=sender, ip_address=ip_address, helo=helo,
