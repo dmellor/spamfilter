@@ -3,6 +3,7 @@ from spamfilter.greylist import GreylistPolicy
 from spamfilter.model.spam import Spam, spam_table
 from spamfilter.model.greylist import create_greylist_class
 from spamfilter.model.smtpdconnection import SmtpdConnection
+from spamfilter.model.loginfailures import LoginFailure
 from spamfilter.mixin import query_postfix_db
 from sqlalchemy.sql import select, func, text
 
@@ -14,6 +15,8 @@ HARD_CLASSC_REJECTED = \
     'reject Spam has recently been received from the %s network'
 SUSPICIOUS_REJECTED = \
     'defer_if_permit Suspicious connection attempts from the %s network'
+ILLEGAL_RELAY_ATTEMPTED = \
+    'reject An illegal attempt to login to this server was made from %s'
 
 OK = 0
 SOFT = 1
@@ -48,7 +51,14 @@ class BlacklistPolicy(GreylistPolicy):
     def process_request(self):
         rcpt_to, mail_from, ip_address = self.get_greylist_tuple()
 
-        # First test - check if the IP address or host name is blacklisted.
+        # First test - if the IP address matches a previous attempt to
+        # login unsuccesfully, then reject.
+        query = self.manager.session.query(LoginFailure)
+        failures = query.filter_by(ip_address=ip_address).count()
+        if failures != 0:
+            return ILLEGAL_RELAY_ATTEMPTED % ip_address
+
+        # Second test - check if the IP address or host name is blacklisted.
         ip_num, helo_num = self.get_blacklist_thresholds()
         if ip_num >= helo_num:
             num = ip_num
@@ -67,7 +77,7 @@ class BlacklistPolicy(GreylistPolicy):
             status1 = ACCEPTED
             level1 = OK
 
-        # Second test - check if the class C network is blacklisted.
+        # Third test - check if the class C network is blacklisted.
         status2 = ACCEPTED
         level2 = OK
         classc_count, distinct_count = self.get_classc_spam_count(ip_address)
@@ -96,7 +106,7 @@ class BlacklistPolicy(GreylistPolicy):
                 self.manager.get('reverse_client_name')):
             return ACCEPTED
 
-        # Third test - check for suspicious activity from class C networks.
+        # Fourth test - check for suspicious activity from class C networks.
         classc = '.'.join(ip_address.split('.')[:3])
         interval = "now() - created <= interval '%s minutes'" % \
                    self.smtpd_connection_interval
