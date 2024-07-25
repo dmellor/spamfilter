@@ -5,6 +5,7 @@ import email
 from email.utils import parseaddr
 from spamfilter.mixin import *
 from spamfilter.model.spam import Spam, SpamRecipient
+from spamfilter.model.virus import Virus, VirusRecipient
 from spamfilter.model.autowhitelist import AutoWhitelist
 from spamfilter.mixin import translate, get_body_type_charset
 
@@ -30,17 +31,30 @@ class Deliver(ConfigMixin):
             query = self.session.query(SpamRecipient).filter_by(
                 delivery_id=delivery_id)
             spam_recipient = query.first()
+            if spam_recipient:
+                klass = Spam
+                id = spam_recipient.spam_id
+                is_virus = False
+            else:
+                query = self.session.query(VirusRecipient).filter_by(
+                    delivery_id=delivery_id)
+                spam_recipient = query.first()
+                if spam_recipient:
+                    klass = Virus
+                    id = spam_recipient.virus_id
+                    is_virus = True
+
             if not spam_recipient:
                 invalid_id()
 
-            spam = self.session.query(Spam).get(spam_recipient.spam_id)
+            spam = self.session.query(klass).get(id)
             if method == 'GET':
                 protocol = 'https://' if os.getenv('HTTPS') else 'http://'
                 confirm(protocol + os.getenv('SERVER_NAME') +
                         os.getenv('SCRIPT_NAME') + os.getenv('PATH_INFO'),
-                        spam)
+                        spam, is_virus)
             else:
-                self.deliver(spam, spam_recipient)
+                self.deliver(spam, spam_recipient, is_virus)
 
             self.session.commit()
         except:
@@ -48,43 +62,49 @@ class Deliver(ConfigMixin):
             raise
 
     # noinspection PyShadowingNames
-    def deliver(self, spam, spam_recipient):
+    def deliver(self, spam, spam_recipient, is_virus):
         # Retrieve the contents before deleting the message, as the contents
         # are deferred and cannot be retrieved after the deletion (SQLAlchemy
         # enters an infinite loop instead of throwing an exception).
         contents = spam.contents
-        tests = spam.tests
+        tests = spam.tests if not is_virus else None
 
         # Delete the entry in the spam_recipients table and the message if
         # the number of spam recipients has dropped to zero.
         self.session.delete(spam_recipient)
-        query = self.session.query(SpamRecipient)
-        if query.filter_by(spam_id=spam_recipient.spam_id).count() == 0:
-            self.session.delete(spam)
+        if not is_virus:
+            query = self.session.query(SpamRecipient)
+            if query.filter_by(spam_id=spam_recipient.spam_id).count() == 0:
+                self.session.delete(spam)
+        else:
+            query = self.session.query(VirusRecipient)
+            if query.filter_by(virus_id=spam_recipient.virus_id).count() == 0:
+                self.session.delete(spam)
 
         # Adjust the auto-whitelist entry. Care must be taken not to include
         # the value of the AWL test if that fired for the message, as the
         # increment added to the total score in the auto_whitelist table will
         # not have included the score for the AWL test.
-        if 'AWL' in [x.name for x in tests]:
-            adjustment = reduce(lambda x, y: x + y,
-                                [x.score for x in tests if x.name != 'AWL'])
-        else:
-            adjustment = spam.score
+        if not is_virus:
+            if 'AWL' in [x.name for x in tests]:
+                adjustment = reduce(lambda x, y: x + y,
+                                    [x.score for x in tests if x.name != 'AWL'])
+            else:
+                adjustment = spam.score
 
-        message = email.message_from_string(contents)
-        mail_from = parseaddr(
-            message['From'] or message['Return-Path'])[1].lower()
-        query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
-        ips, helo = get_received_ips_and_helo(message, self.host)
-        processed_classbs = {}
-        for ip in ips:
-            classb = '.'.join(ip.split('.')[:2])
-            if classb not in processed_classbs:
-                processed_classbs[classb] = True
-                record = query.filter_by(ip=classb).first()
-                if record:
-                    record.totscore -= adjustment
+            message = email.message_from_string(contents)
+            mail_from = parseaddr(
+                message['From'] or message['Return-Path'])[1].lower()
+            query = self.session.query(AutoWhitelist).filter_by(email=mail_from)
+            ips, helo = get_received_ips_and_helo(message, self.host)
+            processed_classbs = {}
+            for ip in ips:
+                classb = '.'.join(ip.split('.')[:2])
+                if classb not in processed_classbs:
+                    processed_classbs[classb] = True
+                    record = query.filter_by(ip=classb).first()
+                    if record:
+                        record.totscore -= adjustment
 
         # Deliver the message.
         mail_server = smtplib.SMTP('localhost')
@@ -94,7 +114,7 @@ class Deliver(ConfigMixin):
         success()
 
 
-def confirm(url, spam):
+def confirm(url, spam, is_virus):
     print 'Content-Type: text/html; charset=utf-8'
     print
     print '<html><head><title>Confirm Message Delivery</title></head>'
@@ -103,15 +123,16 @@ def confirm(url, spam):
         print '<br>From: %s' % spam.bounce
 
     print '<br>Subject: %s' % translate(spam.subject).encode('utf8')
-    reason = 'reasons' if len(spam.tests) > 1 else 'reason'
-    print '<br><br>This message has been quarantined for the following %s:' % \
-        reason
-    print '<ul>'
-    seen = {}
-    for test in spam.tests:
-        if test.description and test.description not in seen:
-            print '<li>%s</li>' % test.description
-            seen[test.description] = True
+    if not is_virus:
+        reason = 'reasons' if len(spam.tests) > 1 else 'reason'
+        print '<br><br>This message has been quarantined for the following %s:' % \
+            reason
+        print '<ul>'
+        seen = {}
+        for test in spam.tests:
+            if test.description and test.description not in seen:
+                print '<li>%s</li>' % test.description
+                seen[test.description] = True
 
     print '</ul>'
     print '<br>The contents of the message are:'
