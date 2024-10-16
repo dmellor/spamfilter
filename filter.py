@@ -77,7 +77,7 @@ def extract_text_content(message):
 
             try:
                 body = body.decode(charset).encode('utf8')
-            except UnicodeDecodeError:
+            except:
                 # If message was badly encoded then process without decoding.
                 pass
     else:
