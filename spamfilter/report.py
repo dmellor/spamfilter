@@ -22,6 +22,7 @@ class ReportGenerator(ConfigMixin):
         self.template = Template(
             filename=os.path.join(os.path.dirname(__file__), 'report.txt'),
             input_encoding='utf-8', output_encoding='utf-8')
+        self.disabled = self.get_config_item_list('report', 'disabled')
 
     # noinspection PyComparisonWithNone
     def report(self):
@@ -47,6 +48,9 @@ class ReportGenerator(ConfigMixin):
         host = self.get_config_item('report', 'host')
         random.seed()
         for recipient in recipients:
+            if recipient in self.disabled:
+                continue
+
             attempt = 0
             while attempt < 2:
                 try:
