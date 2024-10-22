@@ -14,13 +14,17 @@ class Forward(ConfigMixin):
     def __init__(self):
         self.read_config('config.ini')
         self.forward_db = self.get_config_item('forward', 'forward_db')
+        self.mailing_list_db = self.get_config_item('forward',
+                                                    'mailing_list_db')
         self.domain = self.get_config_item('spamfilter', 'domain')
 
     def forward_message(self, recipient):
         message = sys.stdin.read()
         sys.stdin.close()
         message = email.message_from_string(message)
-        message['Reply-To'] = recipient
+        if query_postfix_db(self.mailing_list_db, recipient):
+            message['Reply-To'] = recipient
+
         from_header = message['From']
         match = re.search(r'<([^>]+)>', from_header)
         address = match.group(1).lower()
