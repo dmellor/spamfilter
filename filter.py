@@ -30,6 +30,8 @@ class Filter(ConfigMixin):
 
         message = email.message_from_string(original_message)
         body = extract_text_content(message)
+        subject = message['Subject']
+        sender = message['From']
 
         accepted = True
         with open(filter_file, 'r') as f:
@@ -40,7 +42,8 @@ class Filter(ConfigMixin):
 
                 line = line.rstrip()
                 regexp = re.compile(line, re.I | re.M)
-                if regexp.search(body):
+                if (regexp.search(body) or regexp.search(subject) or
+                        regexp.search(sender)):
                     accepted = False
                     break
 
