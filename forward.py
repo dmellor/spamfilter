@@ -27,8 +27,12 @@ class Forward(ConfigMixin):
 
         from_header = message['From']
         match = re.search(r'<([^>]+)>', from_header)
-        address = match.group(1).lower()
-        srs_address = generate_srs_address(address, self.domain)
+        if match:
+            address = match.group(1).lower()
+            srs_address = generate_srs_address(address, self.domain)
+        else:
+            srs_address = ''
+
         forwards = get_postfix_db_value(self.forward_db, recipient)
         forwards = [x.strip() for x in forwards.split(',')]
         server = smtplib.SMTP('localhost')
