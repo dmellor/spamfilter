@@ -32,6 +32,7 @@ class Filter(ConfigMixin):
         body = extract_text_content(message)
         subject = message['Subject']
         sender = message['From']
+        to = message['To']
 
         accepted = True
         with open(filter_file, 'r') as f:
@@ -43,7 +44,7 @@ class Filter(ConfigMixin):
                 line = line.rstrip()
                 regexp = re.compile(line, re.I | re.M)
                 if (regexp.search(body) or regexp.search(subject) or
-                        regexp.search(sender)):
+                        regexp.search(sender) or regexp.search(to)):
                     accepted = False
                     break
 
