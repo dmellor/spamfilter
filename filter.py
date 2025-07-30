@@ -16,7 +16,7 @@ class Filter(ConfigMixin):
         self.session = create_session(
             self.get_config_item('database', 'dburi'), serializable=False)
 
-    def filter_message(self, recipient, filter_file):
+    def filter_message(self, recipient, filter_file, redirect, redirect_file):
         original_message = sys.stdin.read()
         sys.stdin.close()
 
@@ -52,6 +52,18 @@ class Filter(ConfigMixin):
             deliver_message(recipient, original_message)
         else:
             self.record_message(recipient, original_message)
+
+        with open(redirect_file, 'r') as f:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+
+                line = line.rstrip()
+                regexp = re.compile(line, re.I | re.M)
+                if regexp.search(sender):
+                    deliver_message(redirect, original_message)
+                    break
 
     def record_message(self, recipient, message):
         try:
@@ -100,4 +112,4 @@ def deliver_message(recipient, message):
 
 
 if __name__ == '__main__':
-    Filter().filter_message(sys.argv[1], sys.argv[2])
+    Filter().filter_message(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
